@@ -1,59 +1,131 @@
-package ui;
+package ui; 
 
+import Admin.AdminController;
+import database.databaseConnectors;
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.sql.*;
 import java.time.LocalDate;
 
 public class AdminDashboardFrame extends JFrame {
+    private JTable donorTable;
+    private DefaultTableModel tableModel;
 
     public AdminDashboardFrame() {
-        setTitle("Admin - Manage Events");
-        setSize(400, 300);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setTitle("Admin Dashboard - Manage System");
+        setSize(600, 450); // Slightly taller to fit the back button
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new GridLayout(6, 2, 5, 5));
+        setLayout(new BorderLayout()); // Main layout
 
-        add(new JLabel("Event Name:"));
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // --- TAB 1: Create Event ---
+        JPanel pnlCreateEvent = new JPanel(new GridLayout(6, 2, 5, 5));
+        pnlCreateEvent.add(new JLabel("Event Name:"));
         JTextField txtEvent = new JTextField();
-        add(txtEvent);
+        pnlCreateEvent.add(txtEvent);
 
-        add(new JLabel("Location:"));
+        pnlCreateEvent.add(new JLabel("Location:"));
         JTextField txtLocation = new JTextField();
-        add(txtLocation);
+        pnlCreateEvent.add(txtLocation);
 
-        add(new JLabel("Date (YYYY-MM-DD):"));
+        pnlCreateEvent.add(new JLabel("Date (YYYY-MM-DD):"));
         JTextField txtDate = new JTextField();
-        add(txtDate);
+        pnlCreateEvent.add(txtDate);
 
-        add(new JLabel("Target Capacity:"));
+        pnlCreateEvent.add(new JLabel("Target Capacity:"));
         JSpinner spnCapacity = new JSpinner(new SpinnerNumberModel(50, 10, 1000, 10));
-        add(spnCapacity);
+        pnlCreateEvent.add(spnCapacity);
 
         JButton btnCreate = new JButton("Create Event");
-        JButton btnBack = new JButton("Back to Home");
-
+        pnlCreateEvent.add(btnCreate);
+        
         btnCreate.addActionListener(e -> {
             try {
-                String name = txtEvent.getText();
-                String location = txtLocation.getText();
-                LocalDate date = LocalDate.parse(txtDate.getText());
-                int capacity = (Integer) spnCapacity.getValue();
-
-                Admin.AdminController controller = new Admin.AdminController();
-                controller.createDonationEvent(name, location, date, capacity);
-                
-                JOptionPane.showMessageDialog(this, "Donation Event Created!");
+                AdminController controller = new AdminController();
+                controller.createDonationEvent(txtEvent.getText(), txtLocation.getText(), LocalDate.parse(txtDate.getText()), (Integer) spnCapacity.getValue());
+                JOptionPane.showMessageDialog(this, "Event Created!");
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error: Please check inputs. Date must be YYYY-MM-DD.");
+                JOptionPane.showMessageDialog(this, "Error formatting date.");
             }
         });
 
+        // --- TAB 2: Manage Donors ---
+        JPanel pnlManageDonors = new JPanel(new BorderLayout());
+        tableModel = new DefaultTableModel(new String[]{"ID", "Name", "Email", "Blood Group", "Location"}, 0);
+        donorTable = new JTable(tableModel);
+        pnlManageDonors.add(new JScrollPane(donorTable), BorderLayout.CENTER);
+
+        JPanel pnlTableButtons = new JPanel();
+        JButton btnRefresh = new JButton("Refresh Data");
+        JButton btnDelete = new JButton("Delete Selected Donor");
+        pnlTableButtons.add(btnRefresh);
+        pnlTableButtons.add(btnDelete);
+        pnlManageDonors.add(pnlTableButtons, BorderLayout.SOUTH);
+
+        btnRefresh.addActionListener(e -> loadDonorData());
+
+        btnDelete.addActionListener(e -> {
+            int selectedRow = donorTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a donor from the table first.");
+                return;
+            }
+            String donorId = tableModel.getValueAt(selectedRow, 0).toString();
+            deleteDonor(donorId);
+        });
+
+        tabbedPane.add("Create Event", pnlCreateEvent);
+        tabbedPane.add("Manage Donors", pnlManageDonors);
+        
+        add(tabbedPane, BorderLayout.CENTER); // Add tabs to center
+
+        // --- GLOBAL BACK BUTTON ---
+        JPanel bottomPanel = new JPanel();
+        JButton btnBack = new JButton("Back to Home");
         btnBack.addActionListener(e -> {
             new StartScreenFrame().setVisible(true);
             this.dispose();
         });
+        bottomPanel.add(btnBack);
+        add(bottomPanel, BorderLayout.SOUTH); // Add back button to bottom
 
-        add(btnCreate);
-        add(btnBack);
+        loadDonorData();
+    }
+
+    private void loadDonorData() {
+        tableModel.setRowCount(0); 
+        String sql = "SELECT donor_id, name, email, blood_group, location FROM Donors";
+        
+        try (Connection conn = databaseConnectors.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                    rs.getInt("donor_id"), rs.getString("name"), rs.getString("email"), rs.getString("blood_group"), rs.getString("location")
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void deleteDonor(String donorId) {
+        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete Donor ID " + donorId + "?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            String sql = "DELETE FROM Donors WHERE donor_id = ?";
+            try (Connection conn = databaseConnectors.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, donorId);
+                pstmt.executeUpdate();
+                JOptionPane.showMessageDialog(this, "Donor Deleted.");
+                loadDonorData(); 
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

@@ -2,8 +2,6 @@ package ui;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 public class StartScreenFrame extends JFrame {
 
@@ -11,7 +9,7 @@ public class StartScreenFrame extends JFrame {
         setTitle("Smart Blood Allocation System");
         setSize(400, 300);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null); // Center on screen
+        setLocationRelativeTo(null); 
         setLayout(new GridLayout(5, 1, 10, 10));
 
         JLabel lblTitle = new JLabel("Select Your Portal", SwingConstants.CENTER);
@@ -22,10 +20,10 @@ public class StartScreenFrame extends JFrame {
         JButton btnBloodBank = new JButton("Blood Bank Portal");
         JButton btnAdmin = new JButton("Admin Dashboard");
 
-        // --- Button Actions to Open Other Screens ---
         btnDonor.addActionListener(e -> {
-            new DonorRegistrationFrame().setVisible(true);
-            this.dispose(); // Close start screen
+            // FIXED: It now calls DonorRegistrationFrame directly since they are in the same package
+            new DonorRegistrationFrame().setVisible(true); 
+            this.dispose(); 
         });
 
         btnHospital.addActionListener(e -> {
@@ -43,7 +41,6 @@ public class StartScreenFrame extends JFrame {
             this.dispose();
         });
 
-        // Add components to frame
         add(lblTitle);
         add(btnDonor);
         add(btnHospital);
@@ -51,7 +48,6 @@ public class StartScreenFrame extends JFrame {
         add(btnAdmin);
     }
 
-    // THIS IS THE MAIN ENTRY POINT TO RUN YOUR APP
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             new StartScreenFrame().setVisible(true);

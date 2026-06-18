@@ -1,61 +1,94 @@
-package ui;
+package ui; 
 
+import hospital.HospitalController;
+import database.databaseConnectors;
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.sql.*;
 
 public class HospitalRequestFrame extends JFrame {
+    private DefaultTableModel tableModel;
 
     public HospitalRequestFrame() {
         setTitle("Hospital Blood Request");
-        setSize(400, 300);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(600, 450);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new GridLayout(6, 2, 5, 5));
+        setLayout(new BorderLayout());
 
-        add(new JLabel("Hospital Name:"));
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // --- TAB 1: Live Blood Capacity ---
+        JPanel pnlCapacity = new JPanel(new BorderLayout());
+        tableModel = new DefaultTableModel(new String[]{"Blood Group", "Total Available Bags"}, 0);
+        JTable capacityTable = new JTable(tableModel);
+        pnlCapacity.add(new JScrollPane(capacityTable), BorderLayout.CENTER);
+        
+        JButton btnRefresh = new JButton("Check Current Stock");
+        btnRefresh.addActionListener(e -> loadCapacityData());
+        pnlCapacity.add(btnRefresh, BorderLayout.SOUTH);
+
+        // --- TAB 2: Make a Request ---
+        JPanel pnlRequest = new JPanel(new GridLayout(6, 2, 5, 5));
+        pnlRequest.add(new JLabel("Hospital Name:"));
         JTextField txtHospital = new JTextField();
-        add(txtHospital);
+        pnlRequest.add(txtHospital);
 
-        add(new JLabel("Required Blood Group:"));
+        pnlRequest.add(new JLabel("Required Blood Group:"));
         JComboBox<String> cmbBloodGroup = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
-        add(cmbBloodGroup);
+        pnlRequest.add(cmbBloodGroup);
 
-        add(new JLabel("Quantity (Bags):"));
+        pnlRequest.add(new JLabel("Quantity (Bags):"));
         JSpinner spnQuantity = new JSpinner(new SpinnerNumberModel(1, 1, 50, 1));
-        add(spnQuantity);
+        pnlRequest.add(spnQuantity);
 
-        add(new JLabel("Urgency Level:"));
+        pnlRequest.add(new JLabel("Urgency Level:"));
         JComboBox<String> cmbUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
-        add(cmbUrgency);
+        pnlRequest.add(cmbUrgency);
 
         JButton btnSubmit = new JButton("Submit Request");
-        JButton btnBack = new JButton("Back to Home");
+        pnlRequest.add(btnSubmit);
 
         btnSubmit.addActionListener(e -> {
-            String hospital = txtHospital.getText();
-            String blood = cmbBloodGroup.getSelectedItem().toString();
-            int qty = (Integer) spnQuantity.getValue();
-            String urgency = cmbUrgency.getSelectedItem().toString();
-
-            hospital.HospitalController controller = new hospital.HospitalController();
-            controller.requestBlood(hospital, blood, urgency, qty);
-            
-            JOptionPane.showMessageDialog(this, "Request Submitted Successfully.");
-
-            if (urgency.equals("Emergency")) {
-                emergency.EmergencyEngine engine = new emergency.EmergencyEngine();
-                // Passing a default location for testing, update this to read from hospital location later
-                engine.triggerEmergencyEmails(blood, "Colombo"); 
-                JOptionPane.showMessageDialog(this, "CRITICAL: Emergency Emails Dispatched to Donors!");
-            }
+            HospitalController controller = new HospitalController();
+            controller.requestBlood(txtHospital.getText(), cmbBloodGroup.getSelectedItem().toString(), cmbUrgency.getSelectedItem().toString(), (Integer) spnQuantity.getValue());
+            JOptionPane.showMessageDialog(this, "Request Submitted to Blood Bank.");
         });
 
+        tabbedPane.add("View Live Capacity", pnlCapacity);
+        tabbedPane.add("Send Request", pnlRequest);
+        
+        add(tabbedPane, BorderLayout.CENTER);
+
+        // --- GLOBAL BACK BUTTON ---
+        JPanel bottomPanel = new JPanel();
+        JButton btnBack = new JButton("Back to Home");
         btnBack.addActionListener(e -> {
             new StartScreenFrame().setVisible(true);
             this.dispose();
         });
+        bottomPanel.add(btnBack);
+        add(bottomPanel, BorderLayout.SOUTH);
 
-        add(btnSubmit);
-        add(btnBack);
+        loadCapacityData();
+    }
+
+    private void loadCapacityData() {
+        tableModel.setRowCount(0);
+        String sql = "SELECT blood_group, COUNT(*) as amount FROM Inventory WHERE status = 'Available' GROUP BY blood_group";
+        
+        try (Connection conn = databaseConnectors.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                    rs.getString("blood_group"), rs.getInt("amount")
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
