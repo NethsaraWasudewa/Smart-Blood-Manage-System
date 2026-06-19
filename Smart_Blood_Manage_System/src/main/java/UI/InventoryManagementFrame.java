@@ -10,11 +10,13 @@ import java.sql.*;
 public class InventoryManagementFrame extends JFrame {
     private DefaultTableModel stockModel;
     private DefaultTableModel screeningModel;
+    private DefaultTableModel requestModel; // New table for hospital requests
     private JTable screeningTable;
+    private JTable requestTable;
 
     public InventoryManagementFrame() {
-        setTitle("Blood Bank Inventory & Quality Control");
-        setSize(700, 500);
+        setTitle("Blood Bank Inventory & Fulfillments");
+        setSize(750, 550);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -36,7 +38,7 @@ public class InventoryManagementFrame extends JFrame {
             loadTables(); 
         });
 
-        // --- TAB 2: Screen Blood (NEW) ---
+        // --- TAB 2: Screen Blood ---
         JPanel pnlScreening = new JPanel(new BorderLayout());
         screeningModel = new DefaultTableModel(new String[]{"Bag ID", "Blood Group", "Status"}, 0);
         screeningTable = new JTable(screeningModel);
@@ -51,8 +53,39 @@ public class InventoryManagementFrame extends JFrame {
 
         btnPass.addActionListener(e -> processScreening(true));
         btnFail.addActionListener(e -> processScreening(false));
+        
+        // --- TAB 3: Fulfill Hospital Requests (NEW CONCURRENCY UI) ---
+        JPanel pnlRequests = new JPanel(new BorderLayout());
+        requestModel = new DefaultTableModel(new String[]{"Req ID", "Hospital", "Blood Group", "Urgency", "Quantity"}, 0);
+        requestTable = new JTable(requestModel);
+        pnlRequests.add(new JScrollPane(requestTable), BorderLayout.CENTER);
 
-        // --- TAB 3: View Stock ---
+        JButton btnFulfill = new JButton("Allocate Blood & Dispatch Courier");
+        btnFulfill.addActionListener(e -> {
+            int selectedRow = requestTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(this, "Select a pending request from the table first.");
+                return;
+            }
+            
+            // Extract request data
+            int reqId = (Integer) requestModel.getValueAt(selectedRow, 0);
+            String bg = (String) requestModel.getValueAt(selectedRow, 2);
+            int qty = (Integer) requestModel.getValueAt(selectedRow, 4);
+
+            BloodBankController controller = new BloodBankController();
+            boolean success = controller.allocateBlood(reqId, bg, qty);
+            
+            if (success) {
+                JOptionPane.showMessageDialog(this, "SUCCESS: Blood allocated safely. Delivery dispatched.");
+            } else {
+                JOptionPane.showMessageDialog(this, "ERROR: Not enough safe blood in inventory or bags were locked by another request.", "Concurrency Error", JOptionPane.ERROR_MESSAGE);
+            }
+            loadTables();
+        });
+        pnlRequests.add(btnFulfill, BorderLayout.SOUTH);
+
+        // --- TAB 4: View Stock ---
         JPanel pnlViewInventory = new JPanel(new BorderLayout());
         stockModel = new DefaultTableModel(new String[]{"Bag ID", "Blood Group", "Expiry Date", "Status", "Screening"}, 0);
         JTable inventoryTable = new JTable(stockModel);
@@ -62,8 +95,10 @@ public class InventoryManagementFrame extends JFrame {
         btnRefresh.addActionListener(e -> loadTables());
         pnlViewInventory.add(btnRefresh, BorderLayout.SOUTH);
 
+        // Add Tabs
         tabbedPane.add("Add Stock", pnlAddBlood);
         tabbedPane.add("Lab Screening", pnlScreening);
+        tabbedPane.add("Fulfill Requests", pnlRequests);
         tabbedPane.add("View Stock", pnlViewInventory);
         add(tabbedPane, BorderLayout.CENTER);
 
@@ -95,20 +130,27 @@ public class InventoryManagementFrame extends JFrame {
     private void loadTables() {
         stockModel.setRowCount(0);
         screeningModel.setRowCount(0);
+        requestModel.setRowCount(0);
         
         try (Connection conn = databaseConnectors.getConnection();
              Statement stmt = conn.createStatement()) {
             
-            // Load Testing Bags
+            // 1. Load Testing Bags
             ResultSet rs1 = stmt.executeQuery("SELECT bag_id, blood_group, status FROM Inventory WHERE status = 'Testing'");
             while (rs1.next()) {
                 screeningModel.addRow(new Object[]{rs1.getInt("bag_id"), rs1.getString("blood_group"), rs1.getString("status")});
             }
 
-            // Load All Bags
-            ResultSet rs2 = stmt.executeQuery("SELECT bag_id, blood_group, expiry_date, status, screening_status FROM Inventory ORDER BY expiry_date ASC");
+            // 2. Load Pending Hospital Requests
+            ResultSet rs2 = stmt.executeQuery("SELECT request_id, hospital_name, blood_group, urgency_level, quantity FROM Requests WHERE status = 'Pending'");
             while (rs2.next()) {
-                stockModel.addRow(new Object[]{rs2.getInt("bag_id"), rs2.getString("blood_group"), rs2.getDate("expiry_date"), rs2.getString("status"), rs2.getString("screening_status")});
+                requestModel.addRow(new Object[]{rs2.getInt("request_id"), rs2.getString("hospital_name"), rs2.getString("blood_group"), rs2.getString("urgency_level"), rs2.getInt("quantity")});
+            }
+
+            // 3. Load All Bags
+            ResultSet rs3 = stmt.executeQuery("SELECT bag_id, blood_group, expiry_date, status, screening_status FROM Inventory ORDER BY expiry_date ASC");
+            while (rs3.next()) {
+                stockModel.addRow(new Object[]{rs3.getInt("bag_id"), rs3.getString("blood_group"), rs3.getDate("expiry_date"), rs3.getString("status"), rs3.getString("screening_status")});
             }
         } catch (SQLException e) {
             e.printStackTrace();
