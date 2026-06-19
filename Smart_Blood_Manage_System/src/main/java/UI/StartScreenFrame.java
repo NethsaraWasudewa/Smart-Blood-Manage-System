@@ -1,7 +1,9 @@
-package UI;
+package UI; 
 
+import inventory.ExpiryTask;
 import javax.swing.*;
 import java.awt.*;
+import java.util.Timer; // Needed for background task
 
 public class StartScreenFrame extends JFrame {
 
@@ -21,7 +23,6 @@ public class StartScreenFrame extends JFrame {
         JButton btnAdmin = new JButton("Admin Dashboard");
 
         btnDonor.addActionListener(e -> {
-            // FIXED: It now calls DonorRegistrationFrame directly since they are in the same package
             new DonorRegistrationFrame().setVisible(true); 
             this.dispose(); 
         });
@@ -49,6 +50,14 @@ public class StartScreenFrame extends JFrame {
     }
 
     public static void main(String[] args) {
+        // --- START BACKGROUND AUTOMATION ---
+        // 'true' makes it a daemon thread (runs silently in the background)
+        Timer timer = new Timer(true); 
+        
+        // Schedule it to run instantly (0ms delay), and repeat every 24 hours (86400000 ms)
+        timer.scheduleAtFixedRate(new ExpiryTask(), 0, 86400000);
+        // -----------------------------------
+
         SwingUtilities.invokeLater(() -> {
             new StartScreenFrame().setVisible(true);
         });
