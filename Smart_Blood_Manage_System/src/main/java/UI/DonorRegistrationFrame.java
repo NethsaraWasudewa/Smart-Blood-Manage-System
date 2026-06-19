@@ -1,4 +1,4 @@
-package ui; 
+package UI; 
 
 import user.DonorController;
 import javax.swing.*;

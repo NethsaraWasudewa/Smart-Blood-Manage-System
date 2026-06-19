@@ -1,4 +1,4 @@
-package ui; 
+package UI; 
 
 import inventory.BloodBankController;
 import database.databaseConnectors;
