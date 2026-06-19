@@ -1,4 +1,4 @@
-package UI; // Updated to match the capital letters in your screenshot
+package UI; 
 
 import hospital.HospitalController;
 import database.databaseConnectors;
@@ -26,24 +26,20 @@ public class HospitalRequestFrame extends JFrame {
         JTable capacityTable = new JTable(capacityModel);
         pnlCapacity.add(new JScrollPane(capacityTable), BorderLayout.CENTER);
 
-        // --- TAB 2: Register Patient (NEW ENTITY) ---
+        // --- TAB 2: Register Patient (NEW) ---
         JPanel pnlPatient = new JPanel(new GridLayout(6, 2, 5, 5));
         pnlPatient.add(new JLabel("Hospital Name:"));
         JTextField txtHospPatient = new JTextField();
         pnlPatient.add(txtHospPatient);
-        
         pnlPatient.add(new JLabel("Patient Full Name:"));
         JTextField txtPatName = new JTextField();
         pnlPatient.add(txtPatName);
-        
         pnlPatient.add(new JLabel("Patient Blood Group:"));
         JComboBox<String> cmbPatBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
         pnlPatient.add(cmbPatBlood);
-        
         pnlPatient.add(new JLabel("Ward Number:"));
         JTextField txtWard = new JTextField();
         pnlPatient.add(txtWard);
-        
         JButton btnRegPatient = new JButton("Register Patient");
         pnlPatient.add(btnRegPatient);
 
@@ -52,33 +48,26 @@ public class HospitalRequestFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "Patient Registered Successfully. Check Database for Patient ID.");
         });
 
-        // --- TAB 3: Make a Request (UPDATED TO REQUIRE PATIENT ID) ---
+        // --- TAB 3: Make a Request ---
         JPanel pnlRequest = new JPanel(new GridLayout(7, 2, 5, 5));
         pnlRequest.add(new JLabel("Hospital Name:"));
         JTextField txtHospital = new JTextField();
         pnlRequest.add(txtHospital);
-        
-        // This is the new field needed to fix your error
         pnlRequest.add(new JLabel("Patient ID (Required):"));
         JTextField txtPatientId = new JTextField();
         pnlRequest.add(txtPatientId);
-        
         pnlRequest.add(new JLabel("Required Blood Group:"));
         JComboBox<String> cmbBloodGroup = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
         pnlRequest.add(cmbBloodGroup);
-        
         pnlRequest.add(new JLabel("Quantity (Bags):"));
         JSpinner spnQuantity = new JSpinner(new SpinnerNumberModel(1, 1, 50, 1));
         pnlRequest.add(spnQuantity);
-        
         pnlRequest.add(new JLabel("Urgency Level:"));
         JComboBox<String> cmbUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
         pnlRequest.add(cmbUrgency);
-        
         JButton btnSubmit = new JButton("Submit Request");
         pnlRequest.add(btnSubmit);
 
-        // This action listener now correctly captures the Patient ID and sends 5 arguments
         btnSubmit.addActionListener(e -> {
             try {
                 int pId = Integer.parseInt(txtPatientId.getText());
@@ -89,7 +78,7 @@ public class HospitalRequestFrame extends JFrame {
             }
         });
 
-        // --- TAB 4: Track Deliveries (NEW ENTITY) ---
+        // --- TAB 4: Track Deliveries (NEW) ---
         JPanel pnlDeliveries = new JPanel(new BorderLayout());
         deliveryModel = new DefaultTableModel(new String[]{"Delivery ID", "Req ID", "Driver", "Status"}, 0);
         JTable deliveryTable = new JTable(deliveryModel);
@@ -98,7 +87,7 @@ public class HospitalRequestFrame extends JFrame {
         btnRefreshData.addActionListener(e -> loadTables());
         pnlDeliveries.add(btnRefreshData, BorderLayout.SOUTH);
 
-        // Add all tabs to the main panel
+        // Add tabs
         tabbedPane.add("Live Capacity", pnlCapacity);
         tabbedPane.add("Register Patient", pnlPatient);
         tabbedPane.add("Send Request", pnlRequest);
@@ -125,13 +114,11 @@ public class HospitalRequestFrame extends JFrame {
         try (Connection conn = databaseConnectors.getConnection();
              Statement stmt = conn.createStatement()) {
             
-            // Load live stock capacity
             ResultSet rs1 = stmt.executeQuery("SELECT blood_group, COUNT(*) as amount FROM Inventory WHERE status = 'Available' GROUP BY blood_group");
             while (rs1.next()) {
                 capacityModel.addRow(new Object[]{rs1.getString("blood_group"), rs1.getInt("amount")});
             }
 
-            // Load delivery statuses
             ResultSet rs2 = stmt.executeQuery("SELECT delivery_id, request_id, driver_name, status FROM Deliveries");
             while (rs2.next()) {
                 deliveryModel.addRow(new Object[]{rs2.getInt("delivery_id"), rs2.getInt("request_id"), rs2.getString("driver_name"), rs2.getString("status")});
