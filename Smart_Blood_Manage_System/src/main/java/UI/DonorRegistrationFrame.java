@@ -35,7 +35,13 @@ public class DonorRegistrationFrame extends JFrame {
         add(txtDate);
 
         JButton btnRegister = new JButton("Register");
-        JButton btnBack = new JButton("Back to Home"); // NEW BUTTON
+        JButton btnBack = new JButton("Cancel / Back to Login"); 
+                // ...
+                // Navigation Logic
+                btnBack.addActionListener(e -> {
+                    new DonorLoginFrame().setVisible(true); // <--- Changed to go back to Login Frame
+                    this.dispose();
+                });
         
         btnRegister.addActionListener(e -> {
             try {

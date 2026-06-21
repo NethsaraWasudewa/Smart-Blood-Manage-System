@@ -5,46 +5,85 @@ import java.sql.*;
 import java.time.LocalDate;
 
 public class DonorController {
-    
+
+    // 1. Existing Registration Logic
     public boolean registerDonor(String name, String email, String bloodGroup, String location, LocalDate lastDonation) {
         String sql = "INSERT INTO Donors (name, email, blood_group, location, last_donation_date) VALUES (?, ?, ?, ?, ?)";
-        
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
             pstmt.setString(1, name);
             pstmt.setString(2, email);
             pstmt.setString(3, bloodGroup);
             pstmt.setString(4, location);
             pstmt.setDate(5, Date.valueOf(lastDonation));
-            
-            int rowsAffected = pstmt.executeUpdate();
-            return rowsAffected > 0;
-            
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.out.println("Registration failed: " + e.getMessage());
             return false;
         }
     }
 
+    // 2. Existing Eligibility Logic (The 6-Month Rule)
     public boolean isEligibleToDonate(String email) {
         String sql = "SELECT last_donation_date FROM Donors WHERE email = ?";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
             pstmt.setString(1, email);
             ResultSet rs = pstmt.executeQuery();
-            
             if (rs.next()) {
                 Date lastDate = rs.getDate("last_donation_date");
                 if (lastDate == null) return true; // Never donated
-                
                 LocalDate sixMonthsAgo = LocalDate.now().minusMonths(6);
-                return lastDate.toLocalDate().isBefore(sixMonthsAgo);
+                return lastDate.toLocalDate().isBefore(sixMonthsAgo) || lastDate.toLocalDate().isEqual(sixMonthsAgo);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return false;
+    }
+
+    // 3. NEW: Login Logic (Checks if email exists, returns Donor ID)
+    public int loginDonor(String email) {
+        String sql = "SELECT donor_id FROM Donors WHERE email = ?";
+        try (Connection conn = databaseConnectors.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, email);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("donor_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // -1 means login failed
+    }
+
+    // 4. NEW: Fetch Profile Details
+    public String[] getDonorDetails(int donorId) {
+        String sql = "SELECT name, blood_group, last_donation_date FROM Donors WHERE donor_id = ?";
+        try (Connection conn = databaseConnectors.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, donorId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String dateStr = rs.getDate("last_donation_date") != null ? rs.getDate("last_donation_date").toString() : "No Record";
+                return new String[]{rs.getString("name"), rs.getString("blood_group"), dateStr};
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // 5. NEW: Register for Event
+    public boolean registerForEvent(int donorId, int eventId) {
+        String sql = "INSERT INTO Event_Registrations (donor_id, event_id) VALUES (?, ?)";
+        try (Connection conn = databaseConnectors.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, donorId);
+            pstmt.setInt(2, eventId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            return false; // Will fail if they already registered due to UNIQUE constraint
+        }
     }
 }

@@ -23,7 +23,7 @@ public class StartScreenFrame extends JFrame {
         JButton btnAdmin = new JButton("Admin Dashboard");
 
         btnDonor.addActionListener(e -> {
-            new DonorRegistrationFrame().setVisible(true); 
+            new DonorLoginFrame().setVisible(true); // <--- Changed from Registration to Login
             this.dispose(); 
         });
 
