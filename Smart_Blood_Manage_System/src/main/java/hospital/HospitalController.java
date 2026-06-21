@@ -4,7 +4,6 @@ import database.databaseConnectors;
 import java.sql.*;
 
 public class HospitalController {
-
     public void registerPatient(String hospitalName, String patientName, String bloodGroup, String ward) {
         String sql = "INSERT INTO Patients (hospital_name, patient_name, blood_group, ward_number) VALUES (?, ?, ?, ?)";
         try (Connection conn = databaseConnectors.getConnection();

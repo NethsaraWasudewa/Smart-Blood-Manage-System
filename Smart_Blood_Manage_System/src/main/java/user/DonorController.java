@@ -5,8 +5,6 @@ import java.sql.*;
 import java.time.LocalDate;
 
 public class DonorController {
-
-    // 1. Existing Registration Logic
     public boolean registerDonor(String name, String email, String bloodGroup, String location, LocalDate lastDonation) {
         String sql = "INSERT INTO Donors (name, email, blood_group, location, last_donation_date) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = databaseConnectors.getConnection();
@@ -22,7 +20,6 @@ public class DonorController {
         }
     }
 
-    // 2. Existing Eligibility Logic (The 6-Month Rule)
     public boolean isEligibleToDonate(String email) {
         String sql = "SELECT last_donation_date FROM Donors WHERE email = ?";
         try (Connection conn = databaseConnectors.getConnection();
@@ -31,7 +28,7 @@ public class DonorController {
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
                 Date lastDate = rs.getDate("last_donation_date");
-                if (lastDate == null) return true; // Never donated
+                if (lastDate == null) return true; 
                 LocalDate sixMonthsAgo = LocalDate.now().minusMonths(6);
                 return lastDate.toLocalDate().isBefore(sixMonthsAgo) || lastDate.toLocalDate().isEqual(sixMonthsAgo);
             }
@@ -41,23 +38,19 @@ public class DonorController {
         return false;
     }
 
-    // 3. NEW: Login Logic (Checks if email exists, returns Donor ID)
     public int loginDonor(String email) {
         String sql = "SELECT donor_id FROM Donors WHERE email = ?";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, email);
             ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt("donor_id");
-            }
+            if (rs.next()) return rs.getInt("donor_id");
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return -1; // -1 means login failed
+        return -1; 
     }
 
-    // 4. NEW: Fetch Profile Details
     public String[] getDonorDetails(int donorId) {
         String sql = "SELECT name, blood_group, last_donation_date FROM Donors WHERE donor_id = ?";
         try (Connection conn = databaseConnectors.getConnection();
@@ -74,7 +67,6 @@ public class DonorController {
         return null;
     }
 
-    // 5. NEW: Register for Event
     public boolean registerForEvent(int donorId, int eventId) {
         String sql = "INSERT INTO Event_Registrations (donor_id, event_id) VALUES (?, ?)";
         try (Connection conn = databaseConnectors.getConnection();
@@ -83,7 +75,7 @@ public class DonorController {
             pstmt.setInt(2, eventId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            return false; // Will fail if they already registered due to UNIQUE constraint
+            return false; 
         }
     }
 }

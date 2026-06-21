@@ -5,7 +5,6 @@ import javax.swing.*;
 import java.awt.*;
 
 public class DonorLoginFrame extends JFrame {
-
     public DonorLoginFrame() {
         setTitle("Donor Portal - Login");
         setSize(350, 250);
@@ -26,21 +25,16 @@ public class DonorLoginFrame extends JFrame {
         JPanel pnlButtons = new JPanel(new FlowLayout());
         JButton btnLogin = new JButton("Login");
         JButton btnRegister = new JButton("Create Account");
-        pnlButtons.add(btnLogin);
-        pnlButtons.add(btnRegister);
+        pnlButtons.add(btnLogin); pnlButtons.add(btnRegister);
         add(pnlButtons);
 
         JButton btnBack = new JButton("Back to Home");
         add(btnBack);
 
-        // --- Action Listeners ---
         btnLogin.addActionListener(e -> {
             String email = txtEmail.getText();
-            DonorController controller = new DonorController();
-            int donorId = controller.loginDonor(email);
-            
+            int donorId = new DonorController().loginDonor(email);
             if (donorId != -1) {
-                // Login successful, open dashboard and pass the ID and Email
                 new DonorDashboardFrame(donorId, email).setVisible(true);
                 this.dispose();
             } else {
@@ -48,14 +42,7 @@ public class DonorLoginFrame extends JFrame {
             }
         });
 
-        btnRegister.addActionListener(e -> {
-            new DonorRegistrationFrame().setVisible(true);
-            this.dispose();
-        });
-
-        btnBack.addActionListener(e -> {
-            new StartScreenFrame().setVisible(true);
-            this.dispose();
-        });
+        btnRegister.addActionListener(e -> { new DonorRegistrationFrame().setVisible(true); this.dispose(); });
+        btnBack.addActionListener(e -> { new StartScreenFrame().setVisible(true); this.dispose(); });
     }
 }
