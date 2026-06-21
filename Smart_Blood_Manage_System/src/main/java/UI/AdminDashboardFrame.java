@@ -1,4 +1,4 @@
-package UI; 
+package UI;
 
 import Admin.AdminController;
 import database.databaseConnectors;
@@ -8,16 +8,23 @@ import java.awt.*;
 import java.sql.*;
 import java.time.LocalDate;
 
+// JFreeChart Imports
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.data.category.DefaultCategoryDataset;
+
 public class AdminDashboardFrame extends JFrame {
     private JTable donorTable;
     private DefaultTableModel tableModel;
+    private DefaultCategoryDataset barDataset; // Holds data for the Bar Chart
 
     public AdminDashboardFrame() {
-        setTitle("Admin Dashboard - Manage System");
-        setSize(600, 450); // Slightly taller to fit the back button
+        setTitle("Admin Dashboard - Manage System & Analytics");
+        setSize(700, 550); 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout()); // Main layout
+        setLayout(new BorderLayout()); 
 
         JTabbedPane tabbedPane = new JTabbedPane();
 
@@ -77,10 +84,27 @@ public class AdminDashboardFrame extends JFrame {
             deleteDonor(donorId);
         });
 
+        // --- TAB 3: Donor Demographics (BAR CHART) ---
+        JPanel pnlAnalytics = new JPanel(new BorderLayout());
+        barDataset = new DefaultCategoryDataset();
+        JFreeChart barChart = ChartFactory.createBarChart(
+                "Donor Demographics by Location", // Chart Title
+                "City / Location",               // X-Axis Label
+                "Number of Donors",              // Y-Axis Label
+                barDataset                       // Data
+        );
+        ChartPanel chartPanel = new ChartPanel(barChart);
+        pnlAnalytics.add(chartPanel, BorderLayout.CENTER);
+
+        JButton btnRefreshChart = new JButton("Refresh Chart Data");
+        btnRefreshChart.addActionListener(e -> loadChartData());
+        pnlAnalytics.add(btnRefreshChart, BorderLayout.SOUTH);
+
+        // Add Tabs
         tabbedPane.add("Create Event", pnlCreateEvent);
         tabbedPane.add("Manage Donors", pnlManageDonors);
-        
-        add(tabbedPane, BorderLayout.CENTER); // Add tabs to center
+        tabbedPane.add("Analytics", pnlAnalytics); // New Analytics Tab
+        add(tabbedPane, BorderLayout.CENTER); 
 
         // --- GLOBAL BACK BUTTON ---
         JPanel bottomPanel = new JPanel();
@@ -90,9 +114,11 @@ public class AdminDashboardFrame extends JFrame {
             this.dispose();
         });
         bottomPanel.add(btnBack);
-        add(bottomPanel, BorderLayout.SOUTH); // Add back button to bottom
+        add(bottomPanel, BorderLayout.SOUTH); 
 
+        // Load initial data
         loadDonorData();
+        loadChartData();
     }
 
     private void loadDonorData() {
@@ -102,11 +128,32 @@ public class AdminDashboardFrame extends JFrame {
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
-            
             while (rs.next()) {
                 tableModel.addRow(new Object[]{
                     rs.getInt("donor_id"), rs.getString("name"), rs.getString("email"), rs.getString("blood_group"), rs.getString("location")
                 });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadChartData() {
+        barDataset.clear(); // Clear old data
+        // SQL query aggregates the count of donors grouped by their location
+        String sql = "SELECT location, COUNT(*) as donor_count FROM Donors GROUP BY location";
+        
+        try (Connection conn = databaseConnectors.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                String location = rs.getString("location");
+                int count = rs.getInt("donor_count");
+                if(location == null || location.isEmpty()) location = "Unknown";
+                
+                // Add data to the chart: (Value, Series Name, X-Axis Category)
+                barDataset.addValue(count, "Donors", location);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -123,6 +170,7 @@ public class AdminDashboardFrame extends JFrame {
                 pstmt.executeUpdate();
                 JOptionPane.showMessageDialog(this, "Donor Deleted.");
                 loadDonorData(); 
+                loadChartData(); // Refresh chart when a donor is deleted
             } catch (SQLException e) {
                 e.printStackTrace();
             }
