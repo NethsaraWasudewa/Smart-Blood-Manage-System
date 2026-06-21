@@ -7,23 +7,16 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.*;
 
-// JFreeChart Imports
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.general.DefaultPieDataset;
-
 public class InventoryManagementFrame extends JFrame {
     private DefaultTableModel stockModel;
     private DefaultTableModel screeningModel;
-    private DefaultTableModel requestModel; 
+    private DefaultTableModel requestModel; // New table for hospital requests
     private JTable screeningTable;
     private JTable requestTable;
-    private DefaultPieDataset pieDataset; // Holds data for the Pie Chart
 
     public InventoryManagementFrame() {
-        setTitle("Blood Bank Inventory & Analytics");
-        setSize(800, 600);
+        setTitle("Blood Bank Inventory & Fulfillments");
+        setSize(750, 550);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -43,7 +36,6 @@ public class InventoryManagementFrame extends JFrame {
             controller.addBloodBag(cmbBloodGroup.getSelectedItem().toString());
             JOptionPane.showMessageDialog(this, "Bag added. Sent to Screening Lab.");
             loadTables(); 
-            loadChartData();
         });
 
         // --- TAB 2: Screen Blood ---
@@ -62,7 +54,7 @@ public class InventoryManagementFrame extends JFrame {
         btnPass.addActionListener(e -> processScreening(true));
         btnFail.addActionListener(e -> processScreening(false));
         
-        // --- TAB 3: Fulfill Hospital Requests ---
+        // --- TAB 3: Fulfill Hospital Requests (NEW CONCURRENCY UI) ---
         JPanel pnlRequests = new JPanel(new BorderLayout());
         requestModel = new DefaultTableModel(new String[]{"Req ID", "Hospital", "Blood Group", "Urgency", "Quantity"}, 0);
         requestTable = new JTable(requestModel);
@@ -76,6 +68,7 @@ public class InventoryManagementFrame extends JFrame {
                 return;
             }
             
+            // Extract request data
             int reqId = (Integer) requestModel.getValueAt(selectedRow, 0);
             String bg = (String) requestModel.getValueAt(selectedRow, 2);
             int qty = (Integer) requestModel.getValueAt(selectedRow, 4);
@@ -89,7 +82,6 @@ public class InventoryManagementFrame extends JFrame {
                 JOptionPane.showMessageDialog(this, "ERROR: Not enough safe blood in inventory or bags were locked by another request.", "Concurrency Error", JOptionPane.ERROR_MESSAGE);
             }
             loadTables();
-            loadChartData();
         });
         pnlRequests.add(btnFulfill, BorderLayout.SOUTH);
 
@@ -103,29 +95,11 @@ public class InventoryManagementFrame extends JFrame {
         btnRefresh.addActionListener(e -> loadTables());
         pnlViewInventory.add(btnRefresh, BorderLayout.SOUTH);
 
-        // --- TAB 5: Inventory Analytics (PIE CHART) ---
-        JPanel pnlAnalytics = new JPanel(new BorderLayout());
-        pieDataset = new DefaultPieDataset();
-        JFreeChart pieChart = ChartFactory.createPieChart(
-                "Live Capacity Breakdown (Safe & Available Blood)", // Chart Title
-                pieDataset,  // Data
-                true,        // Include Legend
-                true,        // Tooltips
-                false        // URLs
-        );
-        ChartPanel chartPanel = new ChartPanel(pieChart);
-        pnlAnalytics.add(chartPanel, BorderLayout.CENTER);
-
-        JButton btnRefreshChart = new JButton("Refresh Analytics");
-        btnRefreshChart.addActionListener(e -> loadChartData());
-        pnlAnalytics.add(btnRefreshChart, BorderLayout.SOUTH);
-
         // Add Tabs
         tabbedPane.add("Add Stock", pnlAddBlood);
         tabbedPane.add("Lab Screening", pnlScreening);
         tabbedPane.add("Fulfill Requests", pnlRequests);
         tabbedPane.add("View Stock", pnlViewInventory);
-        tabbedPane.add("Analytics", pnlAnalytics); // New Analytics Tab
         add(tabbedPane, BorderLayout.CENTER);
 
         // Global Back Button
@@ -139,7 +113,6 @@ public class InventoryManagementFrame extends JFrame {
         add(bottomPanel, BorderLayout.SOUTH);
 
         loadTables();
-        loadChartData();
     }
 
     private void processScreening(boolean isSafe) {
@@ -152,7 +125,6 @@ public class InventoryManagementFrame extends JFrame {
         new BloodBankController().screenBloodBag(bagId, isSafe);
         JOptionPane.showMessageDialog(this, isSafe ? "Bag approved for use." : "Bag discarded.");
         loadTables();
-        loadChartData(); // Refresh chart to show new available stock
     }
 
     private void loadTables() {
@@ -163,40 +135,22 @@ public class InventoryManagementFrame extends JFrame {
         try (Connection conn = databaseConnectors.getConnection();
              Statement stmt = conn.createStatement()) {
             
+            // 1. Load Testing Bags
             ResultSet rs1 = stmt.executeQuery("SELECT bag_id, blood_group, status FROM Inventory WHERE status = 'Testing'");
             while (rs1.next()) {
                 screeningModel.addRow(new Object[]{rs1.getInt("bag_id"), rs1.getString("blood_group"), rs1.getString("status")});
             }
 
+            // 2. Load Pending Hospital Requests
             ResultSet rs2 = stmt.executeQuery("SELECT request_id, hospital_name, blood_group, urgency_level, quantity FROM Requests WHERE status = 'Pending'");
             while (rs2.next()) {
                 requestModel.addRow(new Object[]{rs2.getInt("request_id"), rs2.getString("hospital_name"), rs2.getString("blood_group"), rs2.getString("urgency_level"), rs2.getInt("quantity")});
             }
 
+            // 3. Load All Bags
             ResultSet rs3 = stmt.executeQuery("SELECT bag_id, blood_group, expiry_date, status, screening_status FROM Inventory ORDER BY expiry_date ASC");
             while (rs3.next()) {
                 stockModel.addRow(new Object[]{rs3.getInt("bag_id"), rs3.getString("blood_group"), rs3.getDate("expiry_date"), rs3.getString("status"), rs3.getString("screening_status")});
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void loadChartData() {
-        pieDataset.clear(); // Clear old data
-        // SQL query aggregates ONLY blood that has passed screening and is currently available
-        String sql = "SELECT blood_group, COUNT(*) as amount FROM Inventory WHERE status = 'Available' GROUP BY blood_group";
-        
-        try (Connection conn = databaseConnectors.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
-            while (rs.next()) {
-                String bg = rs.getString("blood_group");
-                int amount = rs.getInt("amount");
-                
-                // Add data to the chart: (Section Name, Value)
-                pieDataset.setValue(bg + " (" + amount + " Bags)", amount);
             }
         } catch (SQLException e) {
             e.printStackTrace();
