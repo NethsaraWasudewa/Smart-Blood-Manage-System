@@ -5,6 +5,8 @@ import java.sql.*;
 import java.time.LocalDate;
 
 public class DonorController {
+
+    // Upgraded to handle 'null' if a user has never donated before
     public boolean registerDonor(String name, String email, String bloodGroup, String location, LocalDate lastDonation) {
         String sql = "INSERT INTO Donors (name, email, blood_group, location, last_donation_date) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = databaseConnectors.getConnection();
@@ -13,13 +15,22 @@ public class DonorController {
             pstmt.setString(2, email);
             pstmt.setString(3, bloodGroup);
             pstmt.setString(4, location);
-            pstmt.setDate(5, Date.valueOf(lastDonation));
+            
+            // Safe Null Handling
+            if (lastDonation != null) {
+                pstmt.setDate(5, Date.valueOf(lastDonation));
+            } else {
+                pstmt.setNull(5, Types.DATE);
+            }
+            
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
+            e.printStackTrace();
             return false;
         }
     }
 
+    // EXISTING: Checks eligibility for EXISTING users in the database
     public boolean isEligibleToDonate(String email) {
         String sql = "SELECT last_donation_date FROM Donors WHERE email = ?";
         try (Connection conn = databaseConnectors.getConnection();
@@ -36,6 +47,14 @@ public class DonorController {
             e.printStackTrace();
         }
         return false;
+    }
+
+    // NEW BUG FIX: Checks eligibility for NEW users based on the form input!
+    public boolean isEligibleToDonateFormDate(LocalDate providedDate) {
+        if (providedDate == null) return true; // Never donated before = Eligible!
+        
+        LocalDate sixMonthsAgo = LocalDate.now().minusMonths(6);
+        return providedDate.isBefore(sixMonthsAgo) || providedDate.isEqual(sixMonthsAgo);
     }
 
     public int loginDonor(String email) {
