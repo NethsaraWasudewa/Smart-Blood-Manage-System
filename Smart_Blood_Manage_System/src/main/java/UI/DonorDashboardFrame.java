@@ -16,13 +16,14 @@ public class DonorDashboardFrame extends JFrame {
     private DefaultTableModel eventsModel;
     private DefaultTableModel myEventsModel;
     private JTable eventsTable;
+    private JTable myEventsTable;
 
     public DonorDashboardFrame(int donorId, String email) {
         this.loggedInDonorId = donorId;
         this.loggedInEmail = email;
 
         setTitle("My Donor Dashboard");
-        setSize(700, 550);
+        setSize(750, 550);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -60,15 +61,13 @@ public class DonorDashboardFrame extends JFrame {
             int modelRow = eventsTable.convertRowIndexToModel(selectedRow); 
             int eventId = (Integer) eventsModel.getValueAt(modelRow, 0);
             
-            // Extract the date from the table
             java.sql.Date sqlDate = (java.sql.Date) eventsModel.getValueAt(modelRow, 3);
             LocalDate eventDate = sqlDate.toLocalDate();
             
-            // USE THE NEW ADVANCED ELIGIBILITY ENGINE
             if (controller.checkEventEligibility(loggedInDonorId, eventDate)) {
                 if (controller.registerForEvent(loggedInDonorId, eventId)) {
                     JOptionPane.showMessageDialog(this, "Successfully registered! Check the 'My Registrations' tab for details.");
-                    loadMyEvents(); // Instantly update the new tab!
+                    loadMyEvents(); 
                 } else {
                     JOptionPane.showMessageDialog(this, "You are already registered for this event.");
                 }
@@ -77,20 +76,42 @@ public class DonorDashboardFrame extends JFrame {
             }
         });
 
-        // --- NEW TAB 3: MY REGISTERED EVENTS ---
+        // --- TAB 3: MY REGISTERED EVENTS (With Cancel Feature) ---
         JPanel pnlMyEvents = new JPanel(new BorderLayout());
         myEventsModel = new DefaultTableModel(new String[]{"Event Name", "Location", "Date & Time"}, 0);
-        JTable myEventsTable = new JTable(myEventsModel);
+        myEventsTable = new JTable(myEventsModel);
         pnlMyEvents.add(new JScrollPane(myEventsTable), BorderLayout.CENTER);
         
+        JPanel pnlMyEventsBtns = new JPanel();
         JButton btnRefreshMyEvents = new JButton("Refresh My Schedule");
+        JButton btnCancelEvent = new JButton("Cancel Selected Registration");
+        
+        btnCancelEvent.addActionListener(e -> {
+            int selectedRow = myEventsTable.getSelectedRow();
+            if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a registration to cancel."); return; }
+            
+            String eventName = myEventsModel.getValueAt(selectedRow, 0).toString();
+            
+            if (JOptionPane.showConfirmDialog(this, "Are you sure you want to cancel your registration for: " + eventName + "?", "Confirm Cancellation", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+                if (controller.cancelRegistration(loggedInDonorId, eventName)) {
+                    JOptionPane.showMessageDialog(this, "Registration Cancelled Successfully.");
+                    loadMyEvents();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error cancelling registration.");
+                }
+            }
+        });
+        
+        pnlMyEventsBtns.add(btnRefreshMyEvents);
+        pnlMyEventsBtns.add(btnCancelEvent);
+        pnlMyEvents.add(pnlMyEventsBtns, BorderLayout.SOUTH);
+
         btnRefreshMyEvents.addActionListener(e -> loadMyEvents());
-        pnlMyEvents.add(btnRefreshMyEvents, BorderLayout.SOUTH);
 
         // Build Tabs
         tabbedPane.add("My Profile", pnlProfile);
         tabbedPane.add("Browse Events", pnlEvents);
-        tabbedPane.add("My Registrations", pnlMyEvents); // Add new tab
+        tabbedPane.add("My Registrations", pnlMyEvents); 
         add(tabbedPane, BorderLayout.CENTER);
 
         JPanel bottomPanel = new JPanel();
@@ -100,7 +121,7 @@ public class DonorDashboardFrame extends JFrame {
         add(bottomPanel, BorderLayout.SOUTH);
 
         loadUpcomingEvents();
-        loadMyEvents(); // Load personal schedule on startup
+        loadMyEvents(); 
     }
 
     // SEARCH ENGINE
@@ -126,7 +147,6 @@ public class DonorDashboardFrame extends JFrame {
         panel.add(searchPanel, BorderLayout.NORTH);
     }
 
-    // Load Public Events
     private void loadUpcomingEvents() {
         eventsModel.setRowCount(0);
         String sql = "SELECT event_id, event_name, location, event_date FROM Events WHERE event_date >= CURDATE() ORDER BY event_date ASC";
@@ -137,10 +157,8 @@ public class DonorDashboardFrame extends JFrame {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    // NEW: Load ONLY events this user has registered for
     private void loadMyEvents() {
         myEventsModel.setRowCount(0);
-        // SQL Joins the Events table with the Event_Registrations table specifically for this donor
         String sql = "SELECT e.event_name, e.location, e.event_date FROM Events e JOIN Event_Registrations r ON e.event_id = r.event_id WHERE r.donor_id = ? ORDER BY e.event_date DESC";
         try (Connection conn = databaseConnectors.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, loggedInDonorId);
