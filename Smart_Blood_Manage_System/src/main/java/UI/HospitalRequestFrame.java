@@ -4,12 +4,14 @@ import hospital.HospitalController;
 import database.databaseConnectors;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.sql.*;
 
 public class HospitalRequestFrame extends JFrame {
     private DefaultTableModel capacityModel;
     private DefaultTableModel deliveryModel;
+    private JTable capacityTable, deliveryTable;
 
     public HospitalRequestFrame() {
         setTitle("Hospital Portal - Blood Requests & Deliveries");
@@ -20,13 +22,18 @@ public class HospitalRequestFrame extends JFrame {
 
         JTabbedPane tabbedPane = new JTabbedPane();
 
+        // --- CAPACITY TAB ---
         JPanel pnlCapacity = new JPanel(new BorderLayout());
         capacityModel = new DefaultTableModel(new String[]{"Blood Group", "Safe & Available Bags"}, 0);
-        pnlCapacity.add(new JScrollPane(new JTable(capacityModel)), BorderLayout.CENTER);
+        capacityTable = new JTable(capacityModel);
+        pnlCapacity.add(new JScrollPane(capacityTable), BorderLayout.CENTER);
+        setupSearchPanel(pnlCapacity, capacityModel, capacityTable);
+        
         JButton btnRefreshCap = new JButton("Check Current Stock");
         btnRefreshCap.addActionListener(e -> loadTables());
         pnlCapacity.add(btnRefreshCap, BorderLayout.SOUTH);
 
+        // --- PATIENT TAB ---
         JPanel pnlPatient = new JPanel(new GridLayout(6, 2, 5, 5));
         pnlPatient.add(new JLabel("Hospital Name:")); JTextField txtHospPatient = new JTextField(); pnlPatient.add(txtHospPatient);
         pnlPatient.add(new JLabel("Patient Full Name:")); JTextField txtPatName = new JTextField(); pnlPatient.add(txtPatName);
@@ -39,6 +46,7 @@ public class HospitalRequestFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "Patient Registered Successfully.");
         });
 
+        // --- REQUEST TAB ---
         JPanel pnlRequest = new JPanel(new GridLayout(7, 2, 5, 5));
         pnlRequest.add(new JLabel("Hospital Name:")); JTextField txtHospital = new JTextField(); pnlRequest.add(txtHospital);
         pnlRequest.add(new JLabel("Patient ID (Required):")); JTextField txtPatientId = new JTextField(); pnlRequest.add(txtPatientId);
@@ -54,9 +62,13 @@ public class HospitalRequestFrame extends JFrame {
             } catch (NumberFormatException ex) { JOptionPane.showMessageDialog(this, "Error: Patient ID must be a number."); }
         });
 
+        // --- DELIVERIES TAB ---
         JPanel pnlDeliveries = new JPanel(new BorderLayout());
         deliveryModel = new DefaultTableModel(new String[]{"Delivery ID", "Req ID", "Driver", "Status"}, 0);
-        pnlDeliveries.add(new JScrollPane(new JTable(deliveryModel)), BorderLayout.CENTER);
+        deliveryTable = new JTable(deliveryModel);
+        pnlDeliveries.add(new JScrollPane(deliveryTable), BorderLayout.CENTER);
+        setupSearchPanel(pnlDeliveries, deliveryModel, deliveryTable);
+        
         JButton btnRefreshData = new JButton("Refresh System Data");
         btnRefreshData.addActionListener(e -> loadTables());
         pnlDeliveries.add(btnRefreshData, BorderLayout.SOUTH);
@@ -74,6 +86,29 @@ public class HospitalRequestFrame extends JFrame {
         add(bottomPanel, BorderLayout.SOUTH);
 
         loadTables();
+    }
+
+    // SEARCH ENGINE
+    private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Live Search Filter: "));
+        JTextField txtSearch = new JTextField(25);
+        searchPanel.add(txtSearch);
+
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().length() == 0) sorter.setRowFilter(null);
+                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text)));
+            }
+        });
+        panel.add(searchPanel, BorderLayout.NORTH);
     }
 
     private void loadTables() {

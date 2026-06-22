@@ -4,6 +4,7 @@ import user.DonorController;
 import database.databaseConnectors;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.sql.*;
 
@@ -11,13 +12,14 @@ public class DonorDashboardFrame extends JFrame {
     private int loggedInDonorId;
     private String loggedInEmail;
     private DefaultTableModel eventsModel;
+    private JTable eventsTable;
 
     public DonorDashboardFrame(int donorId, String email) {
         this.loggedInDonorId = donorId;
         this.loggedInEmail = email;
 
         setTitle("My Donor Dashboard");
-        setSize(600, 450);
+        setSize(650, 500);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -36,10 +38,14 @@ public class DonorDashboardFrame extends JFrame {
         pnlProfile.add(new JLabel("Blood Group: " + details[1]));
         pnlProfile.add(new JLabel("Last Recorded Donation: " + details[2]));
 
+        // --- UPCOMING EVENTS TAB ---
         JPanel pnlEvents = new JPanel(new BorderLayout());
         eventsModel = new DefaultTableModel(new String[]{"Event ID", "Event Name", "Location", "Date"}, 0);
-        JTable eventsTable = new JTable(eventsModel);
+        eventsTable = new JTable(eventsModel);
         pnlEvents.add(new JScrollPane(eventsTable), BorderLayout.CENTER);
+        
+        setupSearchPanel(pnlEvents, eventsModel, eventsTable); // SEARCH
+        
         JButton btnRegisterEvent = new JButton("RSVP / Register for Selected Event");
         pnlEvents.add(btnRegisterEvent, BorderLayout.SOUTH);
 
@@ -50,7 +56,10 @@ public class DonorDashboardFrame extends JFrame {
                 JOptionPane.showMessageDialog(this, "You are ineligible to register. You must wait 6 months between donations.", "Safety Warning", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            int eventId = (Integer) eventsModel.getValueAt(selectedRow, 0);
+            
+            int modelRow = eventsTable.convertRowIndexToModel(selectedRow); // SAFE INDEX
+            int eventId = (Integer) eventsModel.getValueAt(modelRow, 0);
+            
             if (controller.registerForEvent(loggedInDonorId, eventId)) {
                 JOptionPane.showMessageDialog(this, "Successfully registered for the event!");
             } else {
@@ -71,12 +80,33 @@ public class DonorDashboardFrame extends JFrame {
         loadUpcomingEvents();
     }
 
+    // SEARCH ENGINE
+    private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Live Search Filter: "));
+        JTextField txtSearch = new JTextField(25);
+        searchPanel.add(txtSearch);
+
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().length() == 0) sorter.setRowFilter(null);
+                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text)));
+            }
+        });
+        panel.add(searchPanel, BorderLayout.NORTH);
+    }
+
     private void loadUpcomingEvents() {
         eventsModel.setRowCount(0);
         String sql = "SELECT event_id, event_name, location, event_date FROM Events WHERE event_date >= CURDATE() ORDER BY event_date ASC";
-        try (Connection conn = databaseConnectors.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 eventsModel.addRow(new Object[]{ rs.getInt("event_id"), rs.getString("event_name"), rs.getString("location"), rs.getDate("event_date") });
             }

@@ -4,6 +4,7 @@ import inventory.BloodBankController;
 import database.databaseConnectors;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.sql.*;
 import org.jfree.chart.ChartFactory;
@@ -13,7 +14,7 @@ import org.jfree.data.general.DefaultPieDataset;
 
 public class InventoryManagementFrame extends JFrame {
     private DefaultTableModel stockModel, screeningModel, requestModel; 
-    private JTable screeningTable, requestTable;
+    private JTable screeningTable, requestTable, inventoryTable;
     private DefaultPieDataset pieDataset;
 
     public InventoryManagementFrame() {
@@ -37,34 +38,44 @@ public class InventoryManagementFrame extends JFrame {
             loadTables(); loadChartData();
         });
 
+        // --- SCREENING TAB ---
         JPanel pnlScreening = new JPanel(new BorderLayout());
         screeningModel = new DefaultTableModel(new String[]{"Bag ID", "Blood Group", "Status"}, 0);
         screeningTable = new JTable(screeningModel);
         pnlScreening.add(new JScrollPane(screeningTable), BorderLayout.CENTER);
+        setupSearchPanel(pnlScreening, screeningModel, screeningTable); // SEARCH
+        
         JPanel pnlScreeningBtns = new JPanel();
         JButton btnPass = new JButton("Mark Safe (Passed)");
         JButton btnFail = new JButton("Mark Unsafe (Discard)");
         pnlScreeningBtns.add(btnPass); pnlScreeningBtns.add(btnFail);
         pnlScreening.add(pnlScreeningBtns, BorderLayout.SOUTH);
-
         btnPass.addActionListener(e -> processScreening(true));
         btnFail.addActionListener(e -> processScreening(false));
         
+        // --- REQUESTS TAB ---
         JPanel pnlRequests = new JPanel(new BorderLayout());
         requestModel = new DefaultTableModel(new String[]{"Req ID", "Hospital", "Blood Group", "Urgency", "Quantity"}, 0);
         requestTable = new JTable(requestModel);
         pnlRequests.add(new JScrollPane(requestTable), BorderLayout.CENTER);
+        setupSearchPanel(pnlRequests, requestModel, requestTable); // SEARCH
+        
         JButton btnFulfill = new JButton("Allocate Blood & Dispatch Courier");
         btnFulfill.addActionListener(e -> fulfillRequest());
         pnlRequests.add(btnFulfill, BorderLayout.SOUTH);
 
+        // --- INVENTORY TAB ---
         JPanel pnlViewInventory = new JPanel(new BorderLayout());
         stockModel = new DefaultTableModel(new String[]{"Bag ID", "Blood Group", "Expiry Date", "Status", "Screening"}, 0);
-        pnlViewInventory.add(new JScrollPane(new JTable(stockModel)), BorderLayout.CENTER);
+        inventoryTable = new JTable(stockModel);
+        pnlViewInventory.add(new JScrollPane(inventoryTable), BorderLayout.CENTER);
+        setupSearchPanel(pnlViewInventory, stockModel, inventoryTable); // SEARCH
+        
         JButton btnRefresh = new JButton("Refresh Data");
         btnRefresh.addActionListener(e -> loadTables());
         pnlViewInventory.add(btnRefresh, BorderLayout.SOUTH);
 
+        // --- ANALYTICS TAB ---
         JPanel pnlAnalytics = new JPanel(new BorderLayout());
         pieDataset = new DefaultPieDataset();
         JFreeChart pieChart = ChartFactory.createPieChart("Live Capacity Breakdown (Safe Blood)", pieDataset, true, true, false);
@@ -89,10 +100,35 @@ public class InventoryManagementFrame extends JFrame {
         loadTables(); loadChartData();
     }
 
+    // SEARCH ENGINE REUSABLE METHOD
+    private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Live Search Filter: "));
+        JTextField txtSearch = new JTextField(25);
+        searchPanel.add(txtSearch);
+
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().length() == 0) sorter.setRowFilter(null);
+                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text)));
+            }
+        });
+        panel.add(searchPanel, BorderLayout.NORTH);
+    }
+
     private void processScreening(boolean isSafe) {
         int selectedRow = screeningTable.getSelectedRow();
         if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a bag."); return; }
-        new BloodBankController().screenBloodBag(screeningModel.getValueAt(selectedRow, 0).toString(), isSafe);
+        
+        int modelRow = screeningTable.convertRowIndexToModel(selectedRow); // SAFE INDEX
+        new BloodBankController().screenBloodBag(screeningModel.getValueAt(modelRow, 0).toString(), isSafe);
         JOptionPane.showMessageDialog(this, isSafe ? "Bag approved." : "Bag discarded.");
         loadTables(); loadChartData(); 
     }
@@ -100,7 +136,9 @@ public class InventoryManagementFrame extends JFrame {
     private void fulfillRequest() {
         int selectedRow = requestTable.getSelectedRow();
         if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a request."); return; }
-        if (new BloodBankController().allocateBlood((Integer) requestModel.getValueAt(selectedRow, 0), (String) requestModel.getValueAt(selectedRow, 2), (Integer) requestModel.getValueAt(selectedRow, 4))) {
+        
+        int modelRow = requestTable.convertRowIndexToModel(selectedRow); // SAFE INDEX
+        if (new BloodBankController().allocateBlood((Integer) requestModel.getValueAt(modelRow, 0), (String) requestModel.getValueAt(modelRow, 2), (Integer) requestModel.getValueAt(modelRow, 4))) {
             JOptionPane.showMessageDialog(this, "SUCCESS: Blood allocated safely.");
         } else {
             JOptionPane.showMessageDialog(this, "ERROR: Not enough safe blood or lock timeout.", "Error", JOptionPane.ERROR_MESSAGE);

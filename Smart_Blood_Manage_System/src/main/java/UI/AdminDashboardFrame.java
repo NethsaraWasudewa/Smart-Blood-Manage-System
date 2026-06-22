@@ -4,6 +4,7 @@ import Admin.AdminController;
 import database.databaseConnectors;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.sql.*;
 import java.time.LocalDate;
@@ -40,10 +41,15 @@ public class AdminDashboardFrame extends JFrame {
             } catch (Exception ex) { JOptionPane.showMessageDialog(this, "Error formatting date."); }
         });
 
+        // --- MANAGE DONORS TAB ---
         JPanel pnlManageDonors = new JPanel(new BorderLayout());
         tableModel = new DefaultTableModel(new String[]{"ID", "Name", "Email", "Blood Group", "Location"}, 0);
         donorTable = new JTable(tableModel);
         pnlManageDonors.add(new JScrollPane(donorTable), BorderLayout.CENTER);
+        
+        // ADDED SEARCH BAR
+        setupSearchPanel(pnlManageDonors, tableModel, donorTable);
+
         JPanel pnlTableButtons = new JPanel();
         JButton btnRefresh = new JButton("Refresh Data");
         JButton btnDelete = new JButton("Delete Selected Donor");
@@ -76,6 +82,29 @@ public class AdminDashboardFrame extends JFrame {
         loadChartData();
     }
 
+    // NEW ENGINE: Creates the live search bar safely
+    private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Live Search Filter: "));
+        JTextField txtSearch = new JTextField(25);
+        searchPanel.add(txtSearch);
+
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().length() == 0) sorter.setRowFilter(null);
+                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text)));
+            }
+        });
+        panel.add(searchPanel, BorderLayout.NORTH);
+    }
+
     private void loadDonorData() {
         tableModel.setRowCount(0); 
         String sql = "SELECT donor_id, name, email, blood_group, location FROM Donors";
@@ -98,7 +127,11 @@ public class AdminDashboardFrame extends JFrame {
     private void deleteDonor() {
         int selectedRow = donorTable.getSelectedRow();
         if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a donor first."); return; }
-        String donorId = tableModel.getValueAt(selectedRow, 0).toString();
+        
+        // NEW: Convert view index to model index to prevent deleting wrong donor while filtering
+        int modelRow = donorTable.convertRowIndexToModel(selectedRow);
+        String donorId = tableModel.getValueAt(modelRow, 0).toString();
+        
         if (JOptionPane.showConfirmDialog(this, "Delete Donor ID " + donorId + "?", "Confirm", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
             String sql = "DELETE FROM Donors WHERE donor_id = ?";
             try (Connection conn = databaseConnectors.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
