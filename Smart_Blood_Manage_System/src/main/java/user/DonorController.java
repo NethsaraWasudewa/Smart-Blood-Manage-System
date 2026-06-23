@@ -6,9 +6,9 @@ import java.time.LocalDate;
 
 public class DonorController {
 
-    // Registers a new donor WITH a password
     public boolean registerDonor(String name, String email, String password, String bloodGroup, String location, LocalDate lastDonation) {
-        String sql = "INSERT INTO Donors (name, email, password, blood_group, location, last_donation_date) VALUES (?, ?, ?, ?, ?, ?)";
+        // FIXED: Now inserts into 'account_password'
+        String sql = "INSERT INTO Donors (name, email, account_password, blood_group, location, last_donation_date) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, name);
@@ -29,9 +29,9 @@ public class DonorController {
         }
     }
 
-    // Secure Login Check
     public int loginDonor(String email, String password) {
-        String sql = "SELECT donor_id FROM Donors WHERE email = ? AND password = ?";
+        // FIXED: Now queries 'account_password'
+        String sql = "SELECT donor_id FROM Donors WHERE email = ? AND account_password = ?";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, email);
@@ -44,7 +44,6 @@ public class DonorController {
         return -1; 
     }
 
-    // Removes a donor's registration for a specific event
     public boolean cancelRegistration(int donorId, String eventName) {
         String sql = "DELETE r FROM Event_Registrations r JOIN Events e ON r.event_id = e.event_id WHERE r.donor_id = ? AND e.event_name = ?";
         try (Connection conn = databaseConnectors.getConnection();
@@ -58,17 +57,14 @@ public class DonorController {
         }
     }
 
-    // Form Eligibility Check
     public boolean isEligibleToDonateFormDate(LocalDate providedDate) {
         if (providedDate == null) return true; 
         LocalDate sixMonthsAgo = LocalDate.now().minusMonths(6);
         return providedDate.isBefore(sixMonthsAgo) || providedDate.isEqual(sixMonthsAgo);
     }
 
-    // Advanced 6-Month Engine Check
     public boolean checkEventEligibility(int donorId, LocalDate targetEventDate) {
         try (Connection conn = databaseConnectors.getConnection()) {
-            // Check past physical donations
             String sql1 = "SELECT last_donation_date FROM Donors WHERE donor_id = ?";
             try (PreparedStatement pstmt1 = conn.prepareStatement(sql1)) {
                 pstmt1.setInt(1, donorId);
@@ -81,7 +77,6 @@ public class DonorController {
                 }
             }
             
-            // Check future registered events
             String sql2 = "SELECT e.event_date FROM Events e JOIN Event_Registrations r ON e.event_id = r.event_id WHERE r.donor_id = ?";
             try (PreparedStatement pstmt2 = conn.prepareStatement(sql2)) {
                 pstmt2.setInt(1, donorId);

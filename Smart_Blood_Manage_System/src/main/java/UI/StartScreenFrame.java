@@ -54,8 +54,10 @@ public class StartScreenFrame extends JFrame {
             this.dispose();
         });
 
+        // --- THE SECURITY FIX ---
+        // Changed to open AdminLoginFrame instead of AdminDashboardFrame
         btnAdmin.addActionListener(e -> {
-            new AdminDashboardFrame().setVisible(true);
+            new AdminLoginFrame().setVisible(true);
             this.dispose();
         });
 
