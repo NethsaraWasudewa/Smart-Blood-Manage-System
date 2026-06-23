@@ -6,7 +6,11 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.sql.*;
+
+// JFreeChart Imports
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -15,76 +19,175 @@ import org.jfree.data.general.DefaultPieDataset;
 public class InventoryManagementFrame extends JFrame {
     private DefaultTableModel stockModel, screeningModel, requestModel; 
     private JTable screeningTable, requestTable, inventoryTable;
+    private TableRowSorter<DefaultTableModel> stockSorter, screeningSorter, requestSorter;
     private DefaultPieDataset pieDataset;
 
     public InventoryManagementFrame() {
-        setTitle("Blood Bank Inventory & Analytics");
-        setSize(850, 650);
+        setTitle("Blood Bank Inventory & Analytics Panel");
+        setSize(850, 650); 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
         JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
 
-        JPanel pnlAddBlood = new JPanel(new GridLayout(3, 2, 5, 5));
-        pnlAddBlood.add(new JLabel("Blood Group Received:"));
+        // =====================================================================
+        // TAB 1: Add Blood
+        // =====================================================================
+        JPanel pnlAddBlood = new JPanel(new GridBagLayout());
+        pnlAddBlood.setBorder(BorderFactory.createEmptyBorder(20, 50, 20, 50));
+        GridBagConstraints gbcAdd = new GridBagConstraints();
+        gbcAdd.fill = GridBagConstraints.HORIZONTAL;
+        gbcAdd.insets = new Insets(10, 0, 10, 0);
+        gbcAdd.weightx = 1.0;
+
+        JLabel lblAddTitle = new JLabel("Log New Biological Asset", SwingConstants.CENTER);
+        lblAddTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        lblAddTitle.setForeground(new Color(41, 128, 185));
+
         JComboBox<String> cmbBloodGroup = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
-        pnlAddBlood.add(cmbBloodGroup);
-        JButton btnAdd = new JButton("Add to Inventory (Send to Testing)"); pnlAddBlood.add(btnAdd);
+        cmbBloodGroup.setPreferredSize(new Dimension(300, 35));
+        
+        JButton btnAdd = new JButton("Add to Inventory (Send to Lab)");
+        stylePrimaryButton(btnAdd);
+
+        gbcAdd.gridy = 0; pnlAddBlood.add(lblAddTitle, gbcAdd);
+        gbcAdd.gridy = 1; pnlAddBlood.add(new JLabel("Acquired Blood Group:"), gbcAdd);
+        gbcAdd.gridy = 2; pnlAddBlood.add(cmbBloodGroup, gbcAdd);
+        gbcAdd.gridy = 3; pnlAddBlood.add(new JLabel(" "), gbcAdd); 
+        gbcAdd.gridy = 4; pnlAddBlood.add(btnAdd, gbcAdd);
 
         btnAdd.addActionListener(e -> {
-            new BloodBankController().addBloodBag(cmbBloodGroup.getSelectedItem().toString());
-            JOptionPane.showMessageDialog(this, "Bag sent to Screening Lab.");
-            loadTables(); loadChartData();
+            BloodBankController controller = new BloodBankController();
+            controller.addBloodBag(cmbBloodGroup.getSelectedItem().toString());
+            JOptionPane.showMessageDialog(this, "Asset logged successfully. Sent to Screening Lab.");
+            loadTables(); 
+            loadChartData();
         });
 
-        // --- SCREENING TAB ---
-        JPanel pnlScreening = new JPanel(new BorderLayout());
+        // =====================================================================
+        // TAB 2: Lab Screening
+        // =====================================================================
+        JPanel pnlScreening = new JPanel(new BorderLayout(10, 10));
+        pnlScreening.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+
+        pnlScreening.add(createSearchBar("Search Bag ID or Group:", "screening"), BorderLayout.NORTH);
+
         screeningModel = new DefaultTableModel(new String[]{"Bag ID", "Blood Group", "Status"}, 0);
         screeningTable = new JTable(screeningModel);
+        screeningTable.setRowHeight(25);
+        screeningSorter = new TableRowSorter<>(screeningModel);
+        screeningTable.setRowSorter(screeningSorter);
         pnlScreening.add(new JScrollPane(screeningTable), BorderLayout.CENTER);
-        setupSearchPanel(pnlScreening, screeningModel, screeningTable); // SEARCH
+
+        JPanel pnlScreeningBtns = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        JButton btnPass = new JButton("✔ Mark Safe (Pass)");
+        styleSuccessButton(btnPass);
+        JButton btnFail = new JButton("✖ Mark Unsafe (Discard)");
+        styleDangerButton(btnFail);
         
-        JPanel pnlScreeningBtns = new JPanel();
-        JButton btnPass = new JButton("Mark Safe (Passed)");
-        JButton btnFail = new JButton("Mark Unsafe (Discard)");
-        pnlScreeningBtns.add(btnPass); pnlScreeningBtns.add(btnFail);
+        pnlScreeningBtns.add(btnPass);
+        pnlScreeningBtns.add(btnFail);
         pnlScreening.add(pnlScreeningBtns, BorderLayout.SOUTH);
+
         btnPass.addActionListener(e -> processScreening(true));
         btnFail.addActionListener(e -> processScreening(false));
         
-        // --- REQUESTS TAB ---
-        JPanel pnlRequests = new JPanel(new BorderLayout());
-        requestModel = new DefaultTableModel(new String[]{"Req ID", "Hospital", "Blood Group", "Urgency", "Quantity"}, 0);
-        requestTable = new JTable(requestModel);
-        pnlRequests.add(new JScrollPane(requestTable), BorderLayout.CENTER);
-        setupSearchPanel(pnlRequests, requestModel, requestTable); // SEARCH
-        
-        JButton btnFulfill = new JButton("Allocate Blood & Dispatch Courier");
-        btnFulfill.addActionListener(e -> fulfillRequest());
-        pnlRequests.add(btnFulfill, BorderLayout.SOUTH);
+        // =====================================================================
+        // TAB 3: Fulfill Requests
+        // =====================================================================
+        JPanel pnlRequests = new JPanel(new BorderLayout(10, 10));
+        pnlRequests.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
 
-        // --- INVENTORY TAB ---
-        JPanel pnlViewInventory = new JPanel(new BorderLayout());
+        pnlRequests.add(createSearchBar("Search Hospital or Blood Group:", "request"), BorderLayout.NORTH);
+
+        requestModel = new DefaultTableModel(new String[]{"Req ID", "Requester Facility", "Blood Group", "Urgency", "Quantity"}, 0);
+        requestTable = new JTable(requestModel);
+        requestTable.setRowHeight(25);
+        requestSorter = new TableRowSorter<>(requestModel);
+        requestTable.setRowSorter(requestSorter);
+        pnlRequests.add(new JScrollPane(requestTable), BorderLayout.CENTER);
+
+        JPanel pnlReqBtn = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton btnFulfill = new JButton("Allocate Blood & Dispatch Courier");
+        stylePrimaryButton(btnFulfill);
+        pnlReqBtn.add(btnFulfill);
+        pnlRequests.add(pnlReqBtn, BorderLayout.SOUTH);
+
+        btnFulfill.addActionListener(e -> {
+            int selectedRow = requestTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a request from the table first.");
+                return;
+            }
+            int modelRow = requestTable.convertRowIndexToModel(selectedRow);
+            
+            int reqId = (Integer) requestModel.getValueAt(modelRow, 0);
+            String bg = (String) requestModel.getValueAt(modelRow, 2);
+            int qty = (Integer) requestModel.getValueAt(modelRow, 4);
+
+            BloodBankController controller = new BloodBankController();
+            boolean success = controller.allocateBlood(reqId, bg, qty);
+            
+            if (success) {
+                JOptionPane.showMessageDialog(this, "SUCCESS: Blood allocated safely. Delivery dispatched.");
+            } else {
+                JOptionPane.showMessageDialog(this, "ERROR: Not enough safe blood in inventory or bags were locked.", "Concurrency Error", JOptionPane.ERROR_MESSAGE);
+            }
+            loadTables();
+            loadChartData();
+        });
+
+        // =====================================================================
+        // TAB 4: View Stock
+        // =====================================================================
+        JPanel pnlViewInventory = new JPanel(new BorderLayout(10, 10));
+        pnlViewInventory.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+
+        pnlViewInventory.add(createSearchBar("Search ID, Group, or Status:", "stock"), BorderLayout.NORTH);
+
         stockModel = new DefaultTableModel(new String[]{"Bag ID", "Blood Group", "Expiry Date", "Status", "Screening"}, 0);
         inventoryTable = new JTable(stockModel);
+        inventoryTable.setRowHeight(25);
+        stockSorter = new TableRowSorter<>(stockModel);
+        inventoryTable.setRowSorter(stockSorter);
         pnlViewInventory.add(new JScrollPane(inventoryTable), BorderLayout.CENTER);
-        setupSearchPanel(pnlViewInventory, stockModel, inventoryTable); // SEARCH
-        
-        JButton btnRefresh = new JButton("Refresh Data");
+
+        JPanel pnlStockBtn = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton btnRefresh = new JButton("Refresh System Data");
+        stylePrimaryButton(btnRefresh);
         btnRefresh.addActionListener(e -> loadTables());
-        pnlViewInventory.add(btnRefresh, BorderLayout.SOUTH);
+        pnlStockBtn.add(btnRefresh);
+        pnlViewInventory.add(pnlStockBtn, BorderLayout.SOUTH);
 
-        // --- ANALYTICS TAB ---
-        JPanel pnlAnalytics = new JPanel(new BorderLayout());
+        // =====================================================================
+        // TAB 5: Analytics
+        // =====================================================================
+        JPanel pnlAnalytics = new JPanel(new BorderLayout(10, 10));
+        pnlAnalytics.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        
         pieDataset = new DefaultPieDataset();
-        JFreeChart pieChart = ChartFactory.createPieChart("Live Capacity Breakdown (Safe Blood)", pieDataset, true, true, false);
-        pnlAnalytics.add(new ChartPanel(pieChart), BorderLayout.CENTER);
-        JButton btnRefreshChart = new JButton("Refresh Analytics");
-        btnRefreshChart.addActionListener(e -> loadChartData());
-        pnlAnalytics.add(btnRefreshChart, BorderLayout.SOUTH);
+        JFreeChart pieChart = ChartFactory.createPieChart(
+                "Live Capacity Breakdown (Safe & Available)", 
+                pieDataset,  
+                true, true, false        
+        );
+        ChartPanel chartPanel = new ChartPanel(pieChart);
+        chartPanel.setBackground(Color.WHITE); 
+        pnlAnalytics.add(chartPanel, BorderLayout.CENTER);
 
-        tabbedPane.add("Add Stock", pnlAddBlood);
+        JPanel pnlChartBtn = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton btnRefreshChart = new JButton("Refresh Analytics Data");
+        stylePrimaryButton(btnRefreshChart);
+        btnRefreshChart.addActionListener(e -> loadChartData());
+        pnlChartBtn.add(btnRefreshChart);
+        pnlAnalytics.add(pnlChartBtn, BorderLayout.SOUTH);
+
+        // =====================================================================
+        // ASSEMBLE TABS AND GLOBAL BACK BUTTON
+        // =====================================================================
+        tabbedPane.add("Add Stock", new JScrollPane(pnlAddBlood));
         tabbedPane.add("Lab Screening", pnlScreening);
         tabbedPane.add("Fulfill Requests", pnlRequests);
         tabbedPane.add("View Stock", pnlViewInventory);
@@ -92,77 +195,135 @@ public class InventoryManagementFrame extends JFrame {
         add(tabbedPane, BorderLayout.CENTER);
 
         JPanel bottomPanel = new JPanel();
-        JButton btnBack = new JButton("Back to Home");
-        btnBack.addActionListener(e -> { new StartScreenFrame().setVisible(true); this.dispose(); });
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 10, 0));
+        JButton btnBack = new JButton("← Back to Home");
+        btnBack.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        btnBack.setContentAreaFilled(false);
+        btnBack.setBorderPainted(false);
+        btnBack.setForeground(Color.GRAY);
+        btnBack.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnBack.addActionListener(e -> {
+            new StartScreenFrame().setVisible(true);
+            this.dispose();
+        });
         bottomPanel.add(btnBack);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        loadTables(); loadChartData();
+        loadTables();
+        loadChartData();
     }
 
-    // SEARCH ENGINE REUSABLE METHOD
-    private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        searchPanel.add(new JLabel("Live Search Filter: "));
-        JTextField txtSearch = new JTextField(25);
-        searchPanel.add(txtSearch);
-
-        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
-        table.setRowSorter(sorter);
-
-        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
-            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
-            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
-            private void filter() {
+    // --- HELPER METHODS ---
+    private JPanel createSearchBar(String labelText, String targetTable) {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        JLabel label = new JLabel(labelText);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        JTextField txtSearch = new JTextField();
+        txtSearch.setPreferredSize(new Dimension(250, 30));
+        
+        txtSearch.addKeyListener(new KeyAdapter() {
+            public void keyReleased(KeyEvent e) {
                 String text = txtSearch.getText();
-                if (text.trim().length() == 0) sorter.setRowFilter(null);
-                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text)));
+                TableRowSorter<DefaultTableModel> activeSorter = null;
+                if (targetTable.equals("screening")) activeSorter = screeningSorter;
+                if (targetTable.equals("request")) activeSorter = requestSorter;
+                if (targetTable.equals("stock")) activeSorter = stockSorter;
+
+                if (activeSorter != null) {
+                    if (text.trim().length() == 0) activeSorter.setRowFilter(null);
+                    else activeSorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+                }
             }
         });
-        panel.add(searchPanel, BorderLayout.NORTH);
+        panel.add(label, BorderLayout.WEST);
+        panel.add(txtSearch, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void stylePrimaryButton(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setBackground(new Color(41, 128, 185));
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(250, 40)); 
+    }
+
+    private void styleSuccessButton(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setBackground(new Color(39, 174, 96)); 
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(220, 40)); 
+    }
+
+    private void styleDangerButton(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setBackground(new Color(231, 76, 60)); 
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(220, 40)); 
     }
 
     private void processScreening(boolean isSafe) {
         int selectedRow = screeningTable.getSelectedRow();
-        if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a bag."); return; }
-        
-        int modelRow = screeningTable.convertRowIndexToModel(selectedRow); // SAFE INDEX
-        new BloodBankController().screenBloodBag(screeningModel.getValueAt(modelRow, 0).toString(), isSafe);
-        JOptionPane.showMessageDialog(this, isSafe ? "Bag approved." : "Bag discarded.");
-        loadTables(); loadChartData(); 
-    }
-
-    private void fulfillRequest() {
-        int selectedRow = requestTable.getSelectedRow();
-        if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a request."); return; }
-        
-        int modelRow = requestTable.convertRowIndexToModel(selectedRow); // SAFE INDEX
-        if (new BloodBankController().allocateBlood((Integer) requestModel.getValueAt(modelRow, 0), (String) requestModel.getValueAt(modelRow, 2), (Integer) requestModel.getValueAt(modelRow, 4))) {
-            JOptionPane.showMessageDialog(this, "SUCCESS: Blood allocated safely.");
-        } else {
-            JOptionPane.showMessageDialog(this, "ERROR: Not enough safe blood or lock timeout.", "Error", JOptionPane.ERROR_MESSAGE);
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Select a bag from the table first.");
+            return;
         }
-        loadTables(); loadChartData();
+        int modelRow = screeningTable.convertRowIndexToModel(selectedRow);
+        String bagId = screeningModel.getValueAt(modelRow, 0).toString();
+        
+        new BloodBankController().screenBloodBag(bagId, isSafe);
+        JOptionPane.showMessageDialog(this, isSafe ? "Bag approved for system release." : "Bag flagged for hazardous waste disposal.");
+        loadTables();
+        loadChartData(); 
     }
 
     private void loadTables() {
-        stockModel.setRowCount(0); screeningModel.setRowCount(0); requestModel.setRowCount(0);
-        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement()) {
+        stockModel.setRowCount(0);
+        screeningModel.setRowCount(0);
+        requestModel.setRowCount(0);
+        
+        try (Connection conn = databaseConnectors.getConnection();
+             Statement stmt = conn.createStatement()) {
+            
             ResultSet rs1 = stmt.executeQuery("SELECT bag_id, blood_group, status FROM Inventory WHERE status = 'Testing'");
-            while (rs1.next()) screeningModel.addRow(new Object[]{rs1.getInt("bag_id"), rs1.getString("blood_group"), rs1.getString("status")});
+            while (rs1.next()) {
+                screeningModel.addRow(new Object[]{rs1.getInt("bag_id"), rs1.getString("blood_group"), rs1.getString("status")});
+            }
+
             ResultSet rs2 = stmt.executeQuery("SELECT request_id, hospital_name, blood_group, urgency_level, quantity FROM Requests WHERE status = 'Pending'");
-            while (rs2.next()) requestModel.addRow(new Object[]{rs2.getInt("request_id"), rs2.getString("hospital_name"), rs2.getString("blood_group"), rs2.getString("urgency_level"), rs2.getInt("quantity")});
+            while (rs2.next()) {
+                requestModel.addRow(new Object[]{rs2.getInt("request_id"), rs2.getString("hospital_name"), rs2.getString("blood_group"), rs2.getString("urgency_level"), rs2.getInt("quantity")});
+            }
+
             ResultSet rs3 = stmt.executeQuery("SELECT bag_id, blood_group, expiry_date, status, screening_status FROM Inventory ORDER BY expiry_date ASC");
-            while (rs3.next()) stockModel.addRow(new Object[]{rs3.getInt("bag_id"), rs3.getString("blood_group"), rs3.getDate("expiry_date"), rs3.getString("status"), rs3.getString("screening_status")});
-        } catch (SQLException e) { e.printStackTrace(); }
+            while (rs3.next()) {
+                stockModel.addRow(new Object[]{rs3.getInt("bag_id"), rs3.getString("blood_group"), rs3.getDate("expiry_date"), rs3.getString("status"), rs3.getString("screening_status")});
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     private void loadChartData() {
         pieDataset.clear(); 
         String sql = "SELECT blood_group, COUNT(*) as amount FROM Inventory WHERE status = 'Available' GROUP BY blood_group";
-        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) pieDataset.setValue(rs.getString("blood_group") + " (" + rs.getInt("amount") + ")", rs.getInt("amount"));
-        } catch (SQLException e) { e.printStackTrace(); }
+        
+        try (Connection conn = databaseConnectors.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                String bg = rs.getString("blood_group");
+                int amount = rs.getInt("amount");
+                pieDataset.setValue(bg + " [" + amount + " Bags]", amount);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
