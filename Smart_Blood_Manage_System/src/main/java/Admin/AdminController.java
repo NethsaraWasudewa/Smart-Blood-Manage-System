@@ -7,18 +7,13 @@ import java.time.LocalDate;
 public class AdminController {
 
     public boolean loginAdmin(String email, String password) {
-        // FIXED: Now queries 'account_password' instead of 'password'
         String sql = "SELECT * FROM Admins WHERE email = ? AND account_password = ?";
-        
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
             pstmt.setString(1, email);
             pstmt.setString(2, password);
-            
             ResultSet rs = pstmt.executeQuery();
             return rs.next(); 
-            
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -36,6 +31,38 @@ public class AdminController {
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    // --- NEW LOGISTICS ENGINE ---
+    // Safely updates both the Deliveries and Requests tables simultaneously
+    public boolean confirmDelivery(int deliveryId, int requestId) {
+        String updateDelivery = "UPDATE Deliveries SET status = 'Delivered' WHERE delivery_id = ?";
+        String updateRequest = "UPDATE Requests SET status = 'Fulfilled' WHERE request_id = ?";
+
+        try (Connection conn = databaseConnectors.getConnection()) {
+            conn.setAutoCommit(false); // Start Transaction
+            
+            try (PreparedStatement pstmt1 = conn.prepareStatement(updateDelivery);
+                 PreparedStatement pstmt2 = conn.prepareStatement(updateRequest)) {
+
+                pstmt1.setInt(1, deliveryId);
+                pstmt1.executeUpdate();
+
+                pstmt2.setInt(1, requestId);
+                pstmt2.executeUpdate();
+
+                conn.commit(); // Commit Transaction if both succeed
+                return true;
+            } catch (SQLException ex) {
+                conn.rollback(); // Undo everything if one fails
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
     }
 }
