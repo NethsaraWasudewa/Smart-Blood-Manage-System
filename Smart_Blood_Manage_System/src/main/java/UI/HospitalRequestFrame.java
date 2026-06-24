@@ -4,251 +4,252 @@ import hospital.HospitalController;
 import database.databaseConnectors;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
 import java.sql.*;
 
 public class HospitalRequestFrame extends JFrame {
-    private DefaultTableModel capacityModel;
-    private DefaultTableModel deliveryModel;
-    private TableRowSorter<DefaultTableModel> capacitySorter;
-    private TableRowSorter<DefaultTableModel> deliverySorter;
+    private JTable inventoryTable, deliveriesTable;
+    private DefaultTableModel inventoryModel, deliveriesModel;
+
+    private final Color primaryBlue = new Color(41, 128, 185);
+    private final Color dangerRed = new Color(231, 76, 60);
 
     public HospitalRequestFrame() {
         setTitle("Hospital Portal - Blood Requests & Deliveries");
-        setSize(800, 650); // Made larger to accommodate professional padding
+        setSize(850, 750); 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
+        getContentPane().setBackground(Color.WHITE);
 
         JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        tabbedPane.setBackground(Color.WHITE);
 
-        // =====================================================================
-        // TAB 1: Live Blood Capacity (Redesigned with Search Logic)
-        // =====================================================================
-        JPanel pnlCapacity = new JPanel(new BorderLayout(10, 10));
-        pnlCapacity.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30)); // Added Padding
+        // ==========================================
+        // TAB 1: LIVE CAPACITY (Inventory)
+        // ==========================================
+        JPanel pnlInventory = new JPanel(new BorderLayout(10, 10));
+        pnlInventory.setBackground(Color.WHITE);
+        pnlInventory.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Search Bar Area
-        JPanel pnlCapSearch = new JPanel(new BorderLayout(10, 10));
-        JLabel lblCapSearch = new JLabel("Live Search Filter (Blood Group):");
-        lblCapSearch.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        JTextField txtCapSearch = new JTextField();
-        txtCapSearch.setPreferredSize(new Dimension(200, 30));
-        pnlCapSearch.add(lblCapSearch, BorderLayout.WEST);
-        pnlCapSearch.add(txtCapSearch, BorderLayout.CENTER);
-        pnlCapacity.add(pnlCapSearch, BorderLayout.NORTH);
+        inventoryModel = new DefaultTableModel(new String[]{"Blood Group", "Available Bags"}, 0);
+        inventoryTable = new JTable(inventoryModel);
+        inventoryTable.setRowHeight(25);
+        pnlInventory.add(new JScrollPane(inventoryTable), BorderLayout.CENTER);
 
-        // Table Area
-        capacityModel = new DefaultTableModel(new String[]{"Blood Group", "Safe & Available Bags"}, 0);
-        JTable capacityTable = new JTable(capacityModel);
-        capacityTable.setRowHeight(25); // Taller rows for readability
+        JButton btnRefreshInv = new JButton("Refresh Live Capacity");
+        styleButton(btnRefreshInv, primaryBlue);
+        btnRefreshInv.addActionListener(e -> loadInventoryData());
         
-        // Add Live Search Logic
-        capacitySorter = new TableRowSorter<>(capacityModel);
-        capacityTable.setRowSorter(capacitySorter);
-        txtCapSearch.addKeyListener(new KeyAdapter() {
-            public void keyReleased(KeyEvent e) {
-                String text = txtCapSearch.getText();
-                if (text.trim().length() == 0) capacitySorter.setRowFilter(null);
-                else capacitySorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+        JPanel pnlInvBtn = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlInvBtn.setBackground(Color.WHITE);
+        pnlInvBtn.add(btnRefreshInv);
+        pnlInventory.add(pnlInvBtn, BorderLayout.SOUTH);
+
+        // ==========================================
+        // TAB 2: REGISTER PATIENT
+        // ==========================================
+        JPanel pnlRegPatientWrapper = new JPanel(new BorderLayout());
+        pnlRegPatientWrapper.setBackground(Color.WHITE);
+
+        JLabel lblRegTitle = new JLabel("Register New Patient", SwingConstants.CENTER);
+        lblRegTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        lblRegTitle.setForeground(primaryBlue);
+        lblRegTitle.setBorder(BorderFactory.createEmptyBorder(30, 0, 20, 0));
+        pnlRegPatientWrapper.add(lblRegTitle, BorderLayout.NORTH);
+
+        JPanel pnlRegPatient = new JPanel(new GridLayout(8, 1, 5, 5));
+        pnlRegPatient.setBackground(Color.WHITE);
+        pnlRegPatient.setBorder(BorderFactory.createEmptyBorder(0, 150, 20, 150));
+
+        pnlRegPatient.add(new JLabel("Hospital Name:"));
+        JTextField txtRegHospName = new JTextField(); pnlRegPatient.add(txtRegHospName);
+
+        pnlRegPatient.add(new JLabel("Patient Name:"));
+        JTextField txtPatientName = new JTextField(); pnlRegPatient.add(txtPatientName);
+
+        pnlRegPatient.add(new JLabel("Blood Group:"));
+        JComboBox<String> cmbRegBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
+        pnlRegPatient.add(cmbRegBlood);
+
+        pnlRegPatient.add(new JLabel("Ward Number:"));
+        JTextField txtWard = new JTextField(); pnlRegPatient.add(txtWard);
+
+        pnlRegPatientWrapper.add(pnlRegPatient, BorderLayout.CENTER);
+
+        JButton btnRegister = new JButton("Register Patient");
+        styleButton(btnRegister, primaryBlue);
+        btnRegister.setPreferredSize(new Dimension(0, 45));
+        
+        JPanel pnlRegBtnWrapper = new JPanel(new BorderLayout());
+        pnlRegBtnWrapper.setBackground(Color.WHITE);
+        pnlRegBtnWrapper.setBorder(BorderFactory.createEmptyBorder(10, 150, 40, 150));
+        pnlRegBtnWrapper.add(btnRegister, BorderLayout.CENTER);
+        pnlRegPatientWrapper.add(pnlRegBtnWrapper, BorderLayout.SOUTH);
+
+        btnRegister.addActionListener(e -> {
+            if(new HospitalController().registerPatient(txtRegHospName.getText(), txtPatientName.getText(), cmbRegBlood.getSelectedItem().toString(), txtWard.getText())) {
+                JOptionPane.showMessageDialog(this, "Patient Registered Successfully!");
+                txtRegHospName.setText(""); txtPatientName.setText(""); txtWard.setText("");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error registering patient.");
             }
         });
-        
-        pnlCapacity.add(new JScrollPane(capacityTable), BorderLayout.CENTER);
 
-        JButton btnRefreshStock = new JButton("Check Current Stock");
-        stylePrimaryButton(btnRefreshStock);
-        btnRefreshStock.addActionListener(e -> loadTables());
-        pnlCapacity.add(btnRefreshStock, BorderLayout.SOUTH);
-
-        // =====================================================================
-        // TAB 2: Register Patient (Redesigned with GridBagLayout)
-        // =====================================================================
-        JPanel pnlPatient = new JPanel(new GridBagLayout());
-        pnlPatient.setBorder(BorderFactory.createEmptyBorder(20, 50, 20, 50));
-        GridBagConstraints gbcPat = new GridBagConstraints();
-        gbcPat.fill = GridBagConstraints.HORIZONTAL;
-        gbcPat.insets = new Insets(8, 0, 8, 0); // Spacing between rows
-        gbcPat.weightx = 1.0;
-
-        JLabel lblPatTitle = new JLabel("Register New Patient", SwingConstants.CENTER);
-        lblPatTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        lblPatTitle.setForeground(new Color(41, 128, 185));
-
-        JTextField txtHospPatient = new JTextField(); txtHospPatient.setPreferredSize(new Dimension(300, 30));
-        JTextField txtPatName = new JTextField(); txtPatName.setPreferredSize(new Dimension(300, 30));
-        JComboBox<String> cmbPatBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
-        JTextField txtWard = new JTextField(); txtWard.setPreferredSize(new Dimension(300, 30));
-        
-        JButton btnRegPatient = new JButton("Register Patient");
-        stylePrimaryButton(btnRegPatient);
-
-        int row = 0;
-        gbcPat.gridy = row++; pnlPatient.add(lblPatTitle, gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(new JLabel("Hospital Name:"), gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(txtHospPatient, gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(new JLabel("Patient Full Name:"), gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(txtPatName, gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(new JLabel("Patient Blood Group:"), gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(cmbPatBlood, gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(new JLabel("Ward Number:"), gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(txtWard, gbcPat);
-        gbcPat.gridy = row++; pnlPatient.add(new JLabel(" "), gbcPat); // Spacer
-        gbcPat.gridy = row++; pnlPatient.add(btnRegPatient, gbcPat);
-
-        btnRegPatient.addActionListener(e -> {
-            new HospitalController().registerPatient(txtHospPatient.getText(), txtPatName.getText(), cmbPatBlood.getSelectedItem().toString(), txtWard.getText());
-            JOptionPane.showMessageDialog(this, "Patient Registered Successfully. Check Database for Patient ID.");
-        });
-
-        // =====================================================================
-        // TAB 3: Send Request (Redesigned with GridBagLayout)
-        // =====================================================================
-        JPanel pnlRequest = new JPanel(new GridBagLayout());
-        pnlRequest.setBorder(BorderFactory.createEmptyBorder(20, 50, 20, 50));
-        GridBagConstraints gbcReq = new GridBagConstraints();
-        gbcReq.fill = GridBagConstraints.HORIZONTAL;
-        gbcReq.insets = new Insets(8, 0, 8, 0);
-        gbcReq.weightx = 1.0;
+        // ==========================================
+        // TAB 3: SEND REQUEST 
+        // ==========================================
+        JPanel pnlRequestWrapper = new JPanel(new BorderLayout());
+        pnlRequestWrapper.setBackground(Color.WHITE);
 
         JLabel lblReqTitle = new JLabel("Submit Blood Allocation Request", SwingConstants.CENTER);
-        lblReqTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        lblReqTitle.setForeground(new Color(41, 128, 185));
+        lblReqTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        lblReqTitle.setForeground(primaryBlue);
+        lblReqTitle.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
+        pnlRequestWrapper.add(lblReqTitle, BorderLayout.NORTH);
 
-        JTextField txtHospital = new JTextField(); txtHospital.setPreferredSize(new Dimension(300, 30));
-        JTextField txtPatientId = new JTextField(); txtPatientId.setPreferredSize(new Dimension(300, 30));
-        JComboBox<String> cmbBloodGroup = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
-        JSpinner spnQuantity = new JSpinner(new SpinnerNumberModel(1, 1, 50, 1));
-        spnQuantity.setPreferredSize(new Dimension(300, 30));
-        JComboBox<String> cmbUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
+        JPanel pnlRequest = new JPanel(new GridLayout(12, 1, 5, 2));
+        pnlRequest.setBackground(Color.WHITE);
+        pnlRequest.setBorder(BorderFactory.createEmptyBorder(0, 150, 10, 150));
+
+        pnlRequest.add(new JLabel("Hospital Name:"));
+        JTextField txtReqHospName = new JTextField(); pnlRequest.add(txtReqHospName);
+
+        JLabel lblCity = new JLabel("Hospital City / Region (For Emergency Alerts):");
+        lblCity.setForeground(dangerRed); 
+        pnlRequest.add(lblCity);
+        JTextField txtReqCity = new JTextField(); pnlRequest.add(txtReqCity);
+
+        pnlRequest.add(new JLabel("Patient ID (Required):"));
+        JTextField txtReqPatId = new JTextField(); pnlRequest.add(txtReqPatId);
+
+        pnlRequest.add(new JLabel("Required Blood Group:"));
+        JComboBox<String> cmbReqBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
+        pnlRequest.add(cmbReqBlood);
+
+        pnlRequest.add(new JLabel("Quantity (Bags):"));
+        JSpinner spnReqQty = new JSpinner(new SpinnerNumberModel(1, 1, 50, 1));
+        pnlRequest.add(spnReqQty);
+
+        pnlRequest.add(new JLabel("Urgency Level:"));
+        JComboBox<String> cmbReqUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
+        pnlRequest.add(cmbReqUrgency);
+
+        pnlRequestWrapper.add(pnlRequest, BorderLayout.CENTER);
+
+        JButton btnSubmitReq = new JButton("Submit Request");
+        styleButton(btnSubmitReq, primaryBlue);
+        btnSubmitReq.setPreferredSize(new Dimension(0, 45));
         
-        JButton btnSubmit = new JButton("Submit Request");
-        stylePrimaryButton(btnSubmit);
+        JPanel pnlReqBtnWrapper = new JPanel(new BorderLayout());
+        pnlReqBtnWrapper.setBackground(Color.WHITE);
+        pnlReqBtnWrapper.setBorder(BorderFactory.createEmptyBorder(10, 150, 20, 150));
+        pnlReqBtnWrapper.add(btnSubmitReq, BorderLayout.CENTER);
+        pnlRequestWrapper.add(pnlReqBtnWrapper, BorderLayout.SOUTH);
 
-        row = 0;
-        gbcReq.gridy = row++; pnlRequest.add(lblReqTitle, gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(new JLabel("Hospital Name:"), gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(txtHospital, gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(new JLabel("Patient ID (Required):"), gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(txtPatientId, gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(new JLabel("Required Blood Group:"), gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(cmbBloodGroup, gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(new JLabel("Quantity (Bags):"), gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(spnQuantity, gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(new JLabel("Urgency Level:"), gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(cmbUrgency, gbcReq);
-        gbcReq.gridy = row++; pnlRequest.add(new JLabel(" "), gbcReq); // Spacer
-        gbcReq.gridy = row++; pnlRequest.add(btnSubmit, gbcReq);
-
-        btnSubmit.addActionListener(e -> {
+        btnSubmitReq.addActionListener(e -> {
             try {
-                int pId = Integer.parseInt(txtPatientId.getText());
-                new HospitalController().requestBlood(txtHospital.getText(), cmbBloodGroup.getSelectedItem().toString(), cmbUrgency.getSelectedItem().toString(), (Integer) spnQuantity.getValue(), pId);
-                JOptionPane.showMessageDialog(this, "Request Submitted to Blood Bank.");
+                int patientId = Integer.parseInt(txtReqPatId.getText());
+                String urgency = cmbReqUrgency.getSelectedItem().toString();
+
+                boolean success = new HospitalController().submitRequest(
+                    txtReqHospName.getText(),
+                    txtReqCity.getText(), 
+                    patientId,
+                    cmbReqBlood.getSelectedItem().toString(),
+                    (Integer) spnReqQty.getValue(),
+                    urgency
+                );
+
+                if (success) {
+                    if(urgency.equals("Emergency")) {
+                        JOptionPane.showMessageDialog(this, "EMERGENCY LOGGED: Local donors in " + txtReqCity.getText() + " have been automatically alerted via email!", "Emergency Dispatch Active", JOptionPane.WARNING_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Standard Request Submitted Successfully.");
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error submitting request. Verify Patient ID exists.");
+                }
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Error: Patient ID must be a number.");
+                JOptionPane.showMessageDialog(this, "Patient ID must be a number.");
             }
         });
 
-        // =====================================================================
-        // TAB 4: Track Deliveries (Redesigned with Search Logic)
-        // =====================================================================
+        // ==========================================
+        // TAB 4: TRACK DELIVERIES
+        // ==========================================
         JPanel pnlDeliveries = new JPanel(new BorderLayout(10, 10));
-        pnlDeliveries.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        pnlDeliveries.setBackground(Color.WHITE);
+        pnlDeliveries.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        JPanel pnlDelSearch = new JPanel(new BorderLayout(10, 10));
-        JLabel lblDelSearch = new JLabel("Live Search Filter (Req ID / Status):");
-        lblDelSearch.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        JTextField txtDelSearch = new JTextField();
-        txtDelSearch.setPreferredSize(new Dimension(200, 30));
-        pnlDelSearch.add(lblDelSearch, BorderLayout.WEST);
-        pnlDelSearch.add(txtDelSearch, BorderLayout.CENTER);
-        pnlDeliveries.add(pnlDelSearch, BorderLayout.NORTH);
+        deliveriesModel = new DefaultTableModel(new String[]{"Delivery ID", "Req ID", "Driver", "Status", "Dispatch Time"}, 0);
+        deliveriesTable = new JTable(deliveriesModel);
+        deliveriesTable.setRowHeight(25);
+        pnlDeliveries.add(new JScrollPane(deliveriesTable), BorderLayout.CENTER);
 
-        deliveryModel = new DefaultTableModel(new String[]{"Delivery ID", "Req ID", "Driver", "Status"}, 0);
-        JTable deliveryTable = new JTable(deliveryModel);
-        deliveryTable.setRowHeight(25);
+        JButton btnRefreshDel = new JButton("Refresh Tracker");
+        styleButton(btnRefreshDel, primaryBlue);
+        btnRefreshDel.addActionListener(e -> loadDeliveriesData());
         
-        // Add Live Search Logic
-        deliverySorter = new TableRowSorter<>(deliveryModel);
-        deliveryTable.setRowSorter(deliverySorter);
-        txtDelSearch.addKeyListener(new KeyAdapter() {
-            public void keyReleased(KeyEvent e) {
-                String text = txtDelSearch.getText();
-                if (text.trim().length() == 0) deliverySorter.setRowFilter(null);
-                else deliverySorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
-            }
-        });
-        
-        pnlDeliveries.add(new JScrollPane(deliveryTable), BorderLayout.CENTER);
+        JPanel pnlDelBtn = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlDelBtn.setBackground(Color.WHITE);
+        pnlDelBtn.add(btnRefreshDel);
+        pnlDeliveries.add(pnlDelBtn, BorderLayout.SOUTH);
 
-        JButton btnRefreshData = new JButton("Refresh System Data");
-        stylePrimaryButton(btnRefreshData);
-        btnRefreshData.addActionListener(e -> loadTables());
-        pnlDeliveries.add(btnRefreshData, BorderLayout.SOUTH);
-
-        // =====================================================================
-        // ASSEMBLE TABS AND GLOBAL BACK BUTTON
-        // =====================================================================
-        tabbedPane.add("Live Capacity", pnlCapacity);
-        tabbedPane.add("Register Patient", new JScrollPane(pnlPatient)); // Scrollpane added in case screen is small
-        tabbedPane.add("Send Request", new JScrollPane(pnlRequest));
+        // --- ADD TABS ---
+        tabbedPane.add("Live Capacity", pnlInventory);
+        tabbedPane.add("Register Patient", pnlRegPatientWrapper);
+        tabbedPane.add("Send Request", pnlRequestWrapper);
         tabbedPane.add("Track Deliveries", pnlDeliveries);
         add(tabbedPane, BorderLayout.CENTER);
 
-        // Global Back Button (Styled as subtle link)
+        // --- BACK BUTTON ---
         JPanel bottomPanel = new JPanel();
+        bottomPanel.setBackground(Color.WHITE);
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
         JButton btnBack = new JButton("← Back to Home");
-        btnBack.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        btnBack.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        btnBack.setForeground(new Color(120, 120, 120));
         btnBack.setContentAreaFilled(false);
         btnBack.setBorderPainted(false);
-        btnBack.setForeground(Color.GRAY);
+        btnBack.setFocusPainted(false);
         btnBack.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btnBack.addActionListener(e -> {
-            new StartScreenFrame().setVisible(true);
-            this.dispose();
-        });
+
+        btnBack.addActionListener(e -> { new StartScreenFrame().setVisible(true); this.dispose(); });
         bottomPanel.add(btnBack);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        loadTables();
+        loadInventoryData();
+        loadDeliveriesData();
     }
 
-    // --- HELPER METHOD TO STYLE BUTTONS UNIFORMLY ---
-    private void stylePrimaryButton(JButton btn) {
+    private void styleButton(JButton btn, Color bgColor) {
         btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        btn.setBackground(new Color(41, 128, 185));
+        btn.setBackground(bgColor);
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(200, 40)); // Make them chunky and modern
     }
 
-    private void loadTables() {
-        capacityModel.setRowCount(0);
-        deliveryModel.setRowCount(0);
-        
-        try (Connection conn = databaseConnectors.getConnection();
-             Statement stmt = conn.createStatement()) {
-            
-            // Load live stock capacity
-            ResultSet rs1 = stmt.executeQuery("SELECT blood_group, COUNT(*) as amount FROM Inventory WHERE status = 'Available' GROUP BY blood_group");
-            while (rs1.next()) {
-                capacityModel.addRow(new Object[]{rs1.getString("blood_group"), rs1.getInt("amount")});
+    private void loadInventoryData() {
+        inventoryModel.setRowCount(0);
+        String sql = "SELECT blood_group, COUNT(*) as available FROM Inventory WHERE status = 'Available' GROUP BY blood_group";
+        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            while(rs.next()) {
+                inventoryModel.addRow(new Object[]{rs.getString("blood_group"), rs.getInt("available")});
             }
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
 
-            // Load delivery statuses
-            ResultSet rs2 = stmt.executeQuery("SELECT delivery_id, request_id, driver_name, status FROM Deliveries");
-            while (rs2.next()) {
-                deliveryModel.addRow(new Object[]{rs2.getInt("delivery_id"), rs2.getInt("request_id"), rs2.getString("driver_name"), rs2.getString("status")});
+    private void loadDeliveriesData() {
+        deliveriesModel.setRowCount(0);
+        String sql = "SELECT delivery_id, request_id, driver_name, status, dispatch_timestamp FROM Deliveries ORDER BY dispatch_timestamp DESC";
+        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            while(rs.next()) {
+                deliveriesModel.addRow(new Object[]{rs.getInt("delivery_id"), rs.getInt("request_id"), rs.getString("driver_name"), rs.getString("status"), rs.getTimestamp("dispatch_timestamp")});
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 }

@@ -34,14 +34,12 @@ public class AdminController {
         }
     }
 
-    // --- NEW LOGISTICS ENGINE ---
-    // Safely updates both the Deliveries and Requests tables simultaneously
     public boolean confirmDelivery(int deliveryId, int requestId) {
         String updateDelivery = "UPDATE Deliveries SET status = 'Delivered' WHERE delivery_id = ?";
         String updateRequest = "UPDATE Requests SET status = 'Fulfilled' WHERE request_id = ?";
 
         try (Connection conn = databaseConnectors.getConnection()) {
-            conn.setAutoCommit(false); // Start Transaction
+            conn.setAutoCommit(false); 
             
             try (PreparedStatement pstmt1 = conn.prepareStatement(updateDelivery);
                  PreparedStatement pstmt2 = conn.prepareStatement(updateRequest)) {
@@ -52,14 +50,36 @@ public class AdminController {
                 pstmt2.setInt(1, requestId);
                 pstmt2.executeUpdate();
 
-                conn.commit(); // Commit Transaction if both succeed
+                conn.commit(); 
                 return true;
             } catch (SQLException ex) {
-                conn.rollback(); // Undo everything if one fails
+                conn.rollback(); 
                 throw ex;
             } finally {
                 conn.setAutoCommit(true);
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // --- NEW: EDIT REQUEST ENGINE ---
+    public boolean updateRequest(int requestId, String hospitalName, int patientId, String bloodGroup, String urgency, int quantity, String status) {
+        String sql = "UPDATE Requests SET hospital_name = ?, patient_id = ?, blood_group = ?, urgency_level = ?, quantity = ?, status = ? WHERE request_id = ?";
+        try (Connection conn = databaseConnectors.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setString(1, hospitalName);
+            pstmt.setInt(2, patientId);
+            pstmt.setString(3, bloodGroup);
+            pstmt.setString(4, urgency);
+            pstmt.setInt(5, quantity);
+            pstmt.setString(6, status);
+            pstmt.setInt(7, requestId);
+            
+            return pstmt.executeUpdate() > 0;
+            
         } catch (SQLException e) {
             e.printStackTrace();
             return false;

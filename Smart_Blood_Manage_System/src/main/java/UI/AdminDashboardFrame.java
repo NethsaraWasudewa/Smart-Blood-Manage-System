@@ -1,7 +1,7 @@
 package UI;
 
 import Admin.AdminController;
-import Admin.ReportGenerator; // NEW IMPORT
+import Admin.ReportGenerator; 
 import database.databaseConnectors;
 import com.toedter.calendar.JDateChooser; 
 import javax.swing.*;
@@ -18,19 +18,19 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.data.category.DefaultCategoryDataset;
 
 public class AdminDashboardFrame extends JFrame {
-    private JTable donorTable, patientTable, requestTable, deliveryTable;
-    private DefaultTableModel donorModel, patientModel, requestModel, deliveryModel;
+    private JTable donorTable, patientTable, requestTable, deliveryTable, alertLogTable;
+    private DefaultTableModel donorModel, patientModel, requestModel, deliveryModel, alertLogModel;
     private DefaultCategoryDataset barDataset;
     
     // Modern Theme Colors
     private final Color primaryBlue = new Color(41, 128, 185);
     private final Color dangerRed = new Color(231, 76, 60);
     private final Color successGreen = new Color(46, 204, 113);
-    private final Color warningOrange = new Color(230, 126, 34); // New color for PDF Button
+    private final Color warningOrange = new Color(230, 126, 34); 
 
     public AdminDashboardFrame() {
         setTitle("Admin Dashboard - Manage System & Analytics");
-        setSize(950, 750); 
+        setSize(1000, 750); 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout()); 
@@ -129,7 +129,7 @@ public class AdminDashboardFrame extends JFrame {
         btnDelete.addActionListener(e -> deleteDonor());
 
         // ==========================================
-        // TAB 3: HOSPITAL RECORDS (Now with PDF Export!)
+        // TAB 3: HOSPITAL RECORDS 
         // ==========================================
         JPanel pnlHospitalRecords = new JPanel(new BorderLayout(10, 10));
         pnlHospitalRecords.setBackground(Color.WHITE);
@@ -139,7 +139,6 @@ public class AdminDashboardFrame extends JFrame {
         splitPane.setResizeWeight(0.5);
         splitPane.setBackground(Color.WHITE);
 
-        // Top: Patients
         JPanel pnlPatients = new JPanel(new BorderLayout());
         pnlPatients.setBackground(Color.WHITE);
         pnlPatients.setBorder(BorderFactory.createTitledBorder(null, "Registered Patients", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new Font("Segoe UI", Font.BOLD, 14), primaryBlue));
@@ -157,7 +156,6 @@ public class AdminDashboardFrame extends JFrame {
         pnlPatBtns.add(btnDelPat);
         pnlPatients.add(pnlPatBtns, BorderLayout.SOUTH);
 
-        // Bottom: Requests
         JPanel pnlRequests = new JPanel(new BorderLayout());
         pnlRequests.setBackground(Color.WHITE);
         pnlRequests.setBorder(BorderFactory.createTitledBorder(null, "Blood Requests", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new Font("Segoe UI", Font.BOLD, 14), primaryBlue));
@@ -170,8 +168,15 @@ public class AdminDashboardFrame extends JFrame {
         
         JPanel pnlReqBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         pnlReqBtns.setBackground(Color.WHITE);
+        
+        // --- NEW EDIT BUTTON ---
+        JButton btnEditReq = new JButton("Edit Selected Request");
+        styleButton(btnEditReq, primaryBlue);
+        
         JButton btnDelReq = new JButton("Delete Selected Request");
         styleButton(btnDelReq, dangerRed);
+        
+        pnlReqBtns.add(btnEditReq); 
         pnlReqBtns.add(btnDelReq);
         pnlRequests.add(pnlReqBtns, BorderLayout.SOUTH);
 
@@ -179,24 +184,23 @@ public class AdminDashboardFrame extends JFrame {
         splitPane.setBottomComponent(pnlRequests);
         pnlHospitalRecords.add(splitPane, BorderLayout.CENTER);
 
-        // --- NEW: EXPORT PDF BUTTON ---
         JButton btnRefreshHospitals = new JButton("Refresh Hospital Data");
         styleButton(btnRefreshHospitals, primaryBlue);
         
         JButton btnExportPDF = new JButton("Export Requests to PDF");
-        styleButton(btnExportPDF, warningOrange); // Gives it a distinct color
+        styleButton(btnExportPDF, warningOrange); 
         
         JPanel pnlHospRefreshWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlHospRefreshWrapper.setBackground(Color.WHITE);
         pnlHospRefreshWrapper.add(btnRefreshHospitals);
-        pnlHospRefreshWrapper.add(btnExportPDF); // Added to panel
+        pnlHospRefreshWrapper.add(btnExportPDF); 
         pnlHospitalRecords.add(pnlHospRefreshWrapper, BorderLayout.SOUTH);
 
         btnRefreshHospitals.addActionListener(e -> loadHospitalData());
         btnDelPat.addActionListener(e -> deletePatient());
         btnDelReq.addActionListener(e -> deleteRequest());
+        btnEditReq.addActionListener(e -> editSelectedRequest()); // Trigger Edit Function
         
-        // --- NEW: PDF GENERATOR ACTION ---
         btnExportPDF.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Save PDF Report");
@@ -206,17 +210,13 @@ public class AdminDashboardFrame extends JFrame {
             if (userSelection == JFileChooser.APPROVE_OPTION) {
                 File fileToSave = fileChooser.getSelectedFile();
                 String filePath = fileToSave.getAbsolutePath();
-                
-                // Ensure it ends with .pdf
-                if (!filePath.toLowerCase().endsWith(".pdf")) {
-                    filePath += ".pdf";
-                }
+                if (!filePath.toLowerCase().endsWith(".pdf")) filePath += ".pdf";
                 
                 ReportGenerator reportGen = new ReportGenerator();
                 if(reportGen.generateHospitalReport(filePath)) {
                     JOptionPane.showMessageDialog(this, "PDF Generated Successfully!\nSaved at: " + filePath, "Success", JOptionPane.INFORMATION_MESSAGE);
                 } else {
-                    JOptionPane.showMessageDialog(this, "Failed to generate PDF. Make sure the file is not currently open.", "Error", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "Failed to generate PDF.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         });
@@ -251,7 +251,31 @@ public class AdminDashboardFrame extends JFrame {
         btnConfirmArrival.addActionListener(e -> confirmDeliveryArrival());
 
         // ==========================================
-        // TAB 5: ANALYTICS
+        // TAB 5: EMERGENCY LOGS 
+        // ==========================================
+        JPanel pnlAlertLogs = new JPanel(new BorderLayout(10, 10));
+        pnlAlertLogs.setBackground(Color.WHITE);
+        pnlAlertLogs.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        alertLogModel = new DefaultTableModel(new String[]{"Log ID", "Req ID", "Patient Name", "Hospital", "Donor Alerted", "Donor Email", "Time Sent"}, 0);
+        alertLogTable = new JTable(alertLogModel);
+        alertLogTable.setRowHeight(25);
+        pnlAlertLogs.add(new JScrollPane(alertLogTable), BorderLayout.CENTER);
+        setupSearchPanel(pnlAlertLogs, alertLogModel, alertLogTable);
+        
+        JPanel pnlAlertBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlAlertBtns.setBackground(Color.WHITE);
+        
+        JButton btnRefreshLogs = new JButton("Refresh Audit Logs");
+        styleButton(btnRefreshLogs, primaryBlue);
+        
+        pnlAlertBtns.add(btnRefreshLogs);
+        pnlAlertLogs.add(pnlAlertBtns, BorderLayout.SOUTH);
+
+        btnRefreshLogs.addActionListener(e -> loadEmergencyLogs());
+
+        // ==========================================
+        // TAB 6: ANALYTICS
         // ==========================================
         JPanel pnlAnalytics = new JPanel(new BorderLayout());
         pnlAnalytics.setBackground(Color.WHITE);
@@ -275,6 +299,7 @@ public class AdminDashboardFrame extends JFrame {
         tabbedPane.add("Manage Donors", pnlManageDonors);
         tabbedPane.add("Hospital Records", pnlHospitalRecords); 
         tabbedPane.add("Logistics", pnlLogistics); 
+        tabbedPane.add("Emergency Logs", pnlAlertLogs); 
         tabbedPane.add("Analytics", pnlAnalytics); 
         add(tabbedPane, BorderLayout.CENTER); 
 
@@ -301,6 +326,7 @@ public class AdminDashboardFrame extends JFrame {
         loadDonorData();
         loadHospitalData();
         loadLogisticsData();
+        loadEmergencyLogs();
         loadChartData();
     }
 
@@ -372,6 +398,24 @@ public class AdminDashboardFrame extends JFrame {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
+    private void loadEmergencyLogs() {
+        alertLogModel.setRowCount(0);
+        String sql = "SELECT l.log_id, l.request_id, p.patient_name, r.hospital_name, l.donor_name, l.donor_email, l.dispatch_timestamp " +
+                     "FROM Emergency_Logs l " +
+                     "JOIN Requests r ON l.request_id = r.request_id " +
+                     "JOIN Patients p ON r.patient_id = p.patient_id " +
+                     "ORDER BY l.dispatch_timestamp DESC";
+        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                alertLogModel.addRow(new Object[]{
+                    rs.getInt("log_id"), rs.getInt("request_id"), rs.getString("patient_name"),
+                    rs.getString("hospital_name"), rs.getString("donor_name"), rs.getString("donor_email"), 
+                    rs.getTimestamp("dispatch_timestamp")
+                });
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
     private void loadChartData() {
         barDataset.clear(); 
         String sql = "SELECT location, COUNT(*) as donor_count FROM Donors GROUP BY location";
@@ -381,6 +425,73 @@ public class AdminDashboardFrame extends JFrame {
                 barDataset.addValue(rs.getInt("donor_count"), "Donors", (loc == null || loc.isEmpty()) ? "Unknown" : loc);
             }
         } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    // --- NEW: EDIT REQUEST FUNCTION ---
+    private void editSelectedRequest() {
+        int selectedRow = requestTable.getSelectedRow();
+        if (selectedRow == -1) { 
+            JOptionPane.showMessageDialog(this, "Select a request from the table to edit."); 
+            return; 
+        }
+        
+        int modelRow = requestTable.convertRowIndexToModel(selectedRow);
+        
+        int requestId = (int) requestModel.getValueAt(modelRow, 0);
+        String currentHosp = requestModel.getValueAt(modelRow, 1).toString();
+        int currentPatId = (int) requestModel.getValueAt(modelRow, 2);
+        String currentBlood = requestModel.getValueAt(modelRow, 3).toString();
+        String currentUrgency = requestModel.getValueAt(modelRow, 4).toString();
+        int currentQty = (int) requestModel.getValueAt(modelRow, 5);
+        String currentStatus = requestModel.getValueAt(modelRow, 6).toString();
+
+        JPanel pnlEdit = new JPanel(new GridLayout(6, 2, 10, 10));
+        pnlEdit.add(new JLabel("Hospital Name:"));
+        JTextField txtHosp = new JTextField(currentHosp); 
+        pnlEdit.add(txtHosp);
+        
+        pnlEdit.add(new JLabel("Patient ID:"));
+        JTextField txtPatId = new JTextField(String.valueOf(currentPatId)); 
+        pnlEdit.add(txtPatId);
+        
+        pnlEdit.add(new JLabel("Blood Group:"));
+        JComboBox<String> cmbBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
+        cmbBlood.setSelectedItem(currentBlood); 
+        pnlEdit.add(cmbBlood);
+        
+        pnlEdit.add(new JLabel("Urgency:"));
+        JComboBox<String> cmbUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
+        cmbUrgency.setSelectedItem(currentUrgency); 
+        pnlEdit.add(cmbUrgency);
+        
+        pnlEdit.add(new JLabel("Quantity (Bags):"));
+        JSpinner spnQty = new JSpinner(new SpinnerNumberModel(currentQty, 1, 100, 1)); 
+        pnlEdit.add(spnQty);
+        
+        pnlEdit.add(new JLabel("Status:"));
+        JComboBox<String> cmbStatus = new JComboBox<>(new String[]{"Pending", "Approved", "Fulfilled", "Cancelled"});
+        cmbStatus.setSelectedItem(currentStatus); 
+        pnlEdit.add(cmbStatus);
+        
+        int result = JOptionPane.showConfirmDialog(this, pnlEdit, "Edit Request ID: " + requestId, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                int newPatId = Integer.parseInt(txtPatId.getText());
+                int newQty = (int) spnQty.getValue();
+                
+                boolean success = new AdminController().updateRequest(requestId, txtHosp.getText(), newPatId, cmbBlood.getSelectedItem().toString(), cmbUrgency.getSelectedItem().toString(), newQty, cmbStatus.getSelectedItem().toString());
+                
+                if (success) {
+                    JOptionPane.showMessageDialog(this, "Request Updated Successfully!");
+                    loadHospitalData(); 
+                } else {
+                    JOptionPane.showMessageDialog(this, "Update Failed. Please check the database connection.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Patient ID must be a valid number.", "Input Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private void confirmDeliveryArrival() {

@@ -61,12 +61,14 @@ public class DonorDashboardFrame extends JFrame {
             int modelRow = eventsTable.convertRowIndexToModel(selectedRow); 
             int eventId = (Integer) eventsModel.getValueAt(modelRow, 0);
             
+            String eventName = (String) eventsModel.getValueAt(modelRow, 1);
+            String eventLocation = (String) eventsModel.getValueAt(modelRow, 2);
             java.sql.Date sqlDate = (java.sql.Date) eventsModel.getValueAt(modelRow, 3);
             LocalDate eventDate = sqlDate.toLocalDate();
             
             if (controller.checkEventEligibility(loggedInDonorId, eventDate)) {
-                if (controller.registerForEvent(loggedInDonorId, eventId)) {
-                    JOptionPane.showMessageDialog(this, "Successfully registered! Check the 'My Registrations' tab for details.");
+                if (controller.registerForEvent(loggedInDonorId, eventId, loggedInEmail, eventName, eventDate, eventLocation)) {
+                    JOptionPane.showMessageDialog(this, "Successfully registered! A confirmation email has been sent to your inbox.");
                     loadMyEvents(); 
                 } else {
                     JOptionPane.showMessageDialog(this, "You are already registered for this event.");
@@ -76,7 +78,7 @@ public class DonorDashboardFrame extends JFrame {
             }
         });
 
-        // --- TAB 3: MY REGISTERED EVENTS (With Cancel Feature) ---
+        // --- TAB 3: MY REGISTERED EVENTS ---
         JPanel pnlMyEvents = new JPanel(new BorderLayout());
         myEventsModel = new DefaultTableModel(new String[]{"Event Name", "Location", "Date & Time"}, 0);
         myEventsTable = new JTable(myEventsModel);
@@ -124,7 +126,6 @@ public class DonorDashboardFrame extends JFrame {
         loadMyEvents(); 
     }
 
-    // SEARCH ENGINE
     private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         searchPanel.add(new JLabel("Live Search Filter: "));
@@ -164,11 +165,7 @@ public class DonorDashboardFrame extends JFrame {
             pstmt.setInt(1, loggedInDonorId);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                myEventsModel.addRow(new Object[]{ 
-                    rs.getString("event_name"), 
-                    rs.getString("location"), 
-                    rs.getDate("event_date") 
-                });
+                myEventsModel.addRow(new Object[]{ rs.getString("event_name"), rs.getString("location"), rs.getDate("event_date") });
             }
         } catch (SQLException e) { e.printStackTrace(); }
     }

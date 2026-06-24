@@ -7,7 +7,6 @@ import java.time.LocalDate;
 public class DonorController {
 
     public boolean registerDonor(String name, String email, String password, String bloodGroup, String location, LocalDate lastDonation) {
-        // FIXED: Now inserts into 'account_password'
         String sql = "INSERT INTO Donors (name, email, account_password, blood_group, location, last_donation_date) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -22,7 +21,20 @@ public class DonorController {
             } else {
                 pstmt.setNull(6, Types.DATE);
             }
-            return pstmt.executeUpdate() > 0;
+            
+            boolean success = pstmt.executeUpdate() > 0;
+            
+            // --- AUTOMATED WELCOME EMAIL ---
+            if (success) {
+                String subject = "Welcome to the Smart Blood Bank!";
+                String body = "<h3>Hello " + name + ",</h3>"
+                            + "<p>Thank you for registering with the Smart Blood Allocation System.</p>"
+                            + "<p>Your registered blood group is <b>" + bloodGroup + "</b>. You can now log into the portal to track your schedule and RSVP for upcoming life-saving donation drives.</p>"
+                            + "<p>Stay healthy!</p>";
+                EmailEngine.sendEmailInBackground(email, subject, body);
+            }
+            
+            return success;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -30,7 +42,6 @@ public class DonorController {
     }
 
     public int loginDonor(String email, String password) {
-        // FIXED: Now queries 'account_password'
         String sql = "SELECT donor_id FROM Donors WHERE email = ? AND account_password = ?";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -111,13 +122,32 @@ public class DonorController {
         return null;
     }
 
-    public boolean registerForEvent(int donorId, int eventId) {
+    // --- UPGRADED: NOW TAKES 6 PARAMETERS TO SEND THE RSVP EMAIL ---
+    public boolean registerForEvent(int donorId, int eventId, String donorEmail, String eventName, LocalDate eventDate, String eventLocation) {
         String sql = "INSERT INTO Event_Registrations (donor_id, event_id) VALUES (?, ?)";
         try (Connection conn = databaseConnectors.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, donorId);
             pstmt.setInt(2, eventId);
-            return pstmt.executeUpdate() > 0;
+            
+            boolean success = pstmt.executeUpdate() > 0;
+            
+            // --- AUTOMATED RSVP EMAIL ---
+            if (success) {
+                String subject = "RSVP Confirmed: " + eventName;
+                String body = "<h3>Your registration is confirmed!</h3>"
+                            + "<p>You have successfully signed up for the upcoming donation drive.</p>"
+                            + "<ul>"
+                            + "<li><b>Event:</b> " + eventName + "</li>"
+                            + "<li><b>Date:</b> " + eventDate.toString() + "</li>"
+                            + "<li><b>Location:</b> " + eventLocation + "</li>"
+                            + "</ul>"
+                            + "<p>Please ensure you are well-hydrated and have eaten a good meal before arriving.</p>";
+                
+                EmailEngine.sendEmailInBackground(donorEmail, subject, body);
+            }
+            
+            return success;
         } catch (SQLException e) {
             return false; 
         }
