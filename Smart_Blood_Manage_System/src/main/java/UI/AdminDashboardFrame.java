@@ -168,15 +168,8 @@ public class AdminDashboardFrame extends JFrame {
         
         JPanel pnlReqBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         pnlReqBtns.setBackground(Color.WHITE);
-        
-        // --- NEW EDIT BUTTON ---
-        JButton btnEditReq = new JButton("Edit Selected Request");
-        styleButton(btnEditReq, primaryBlue);
-        
         JButton btnDelReq = new JButton("Delete Selected Request");
         styleButton(btnDelReq, dangerRed);
-        
-        pnlReqBtns.add(btnEditReq); 
         pnlReqBtns.add(btnDelReq);
         pnlRequests.add(pnlReqBtns, BorderLayout.SOUTH);
 
@@ -199,7 +192,6 @@ public class AdminDashboardFrame extends JFrame {
         btnRefreshHospitals.addActionListener(e -> loadHospitalData());
         btnDelPat.addActionListener(e -> deletePatient());
         btnDelReq.addActionListener(e -> deleteRequest());
-        btnEditReq.addActionListener(e -> editSelectedRequest()); // Trigger Edit Function
         
         btnExportPDF.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
@@ -251,7 +243,7 @@ public class AdminDashboardFrame extends JFrame {
         btnConfirmArrival.addActionListener(e -> confirmDeliveryArrival());
 
         // ==========================================
-        // TAB 5: EMERGENCY LOGS 
+        // TAB 5: EMERGENCY LOGS (UPGRADED)
         // ==========================================
         JPanel pnlAlertLogs = new JPanel(new BorderLayout(10, 10));
         pnlAlertLogs.setBackground(Color.WHITE);
@@ -269,10 +261,16 @@ public class AdminDashboardFrame extends JFrame {
         JButton btnRefreshLogs = new JButton("Refresh Audit Logs");
         styleButton(btnRefreshLogs, primaryBlue);
         
+        // NEW DELETE BUTTON
+        JButton btnDeleteLogReq = new JButton("Delete Selected Request");
+        styleButton(btnDeleteLogReq, dangerRed);
+        
         pnlAlertBtns.add(btnRefreshLogs);
+        pnlAlertBtns.add(btnDeleteLogReq); // Added to panel
         pnlAlertLogs.add(pnlAlertBtns, BorderLayout.SOUTH);
 
         btnRefreshLogs.addActionListener(e -> loadEmergencyLogs());
+        btnDeleteLogReq.addActionListener(e -> deleteRequestFromLog()); // Connected to new action
 
         // ==========================================
         // TAB 6: ANALYTICS
@@ -364,6 +362,7 @@ public class AdminDashboardFrame extends JFrame {
         panel.add(searchPanel, BorderLayout.NORTH);
     }
 
+    // --- DATA LOADERS ---
     private void loadDonorData() {
         donorModel.setRowCount(0); 
         String sql = "SELECT donor_id, name, email, blood_group, location FROM Donors";
@@ -427,73 +426,7 @@ public class AdminDashboardFrame extends JFrame {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    // --- NEW: EDIT REQUEST FUNCTION ---
-    private void editSelectedRequest() {
-        int selectedRow = requestTable.getSelectedRow();
-        if (selectedRow == -1) { 
-            JOptionPane.showMessageDialog(this, "Select a request from the table to edit."); 
-            return; 
-        }
-        
-        int modelRow = requestTable.convertRowIndexToModel(selectedRow);
-        
-        int requestId = (int) requestModel.getValueAt(modelRow, 0);
-        String currentHosp = requestModel.getValueAt(modelRow, 1).toString();
-        int currentPatId = (int) requestModel.getValueAt(modelRow, 2);
-        String currentBlood = requestModel.getValueAt(modelRow, 3).toString();
-        String currentUrgency = requestModel.getValueAt(modelRow, 4).toString();
-        int currentQty = (int) requestModel.getValueAt(modelRow, 5);
-        String currentStatus = requestModel.getValueAt(modelRow, 6).toString();
-
-        JPanel pnlEdit = new JPanel(new GridLayout(6, 2, 10, 10));
-        pnlEdit.add(new JLabel("Hospital Name:"));
-        JTextField txtHosp = new JTextField(currentHosp); 
-        pnlEdit.add(txtHosp);
-        
-        pnlEdit.add(new JLabel("Patient ID:"));
-        JTextField txtPatId = new JTextField(String.valueOf(currentPatId)); 
-        pnlEdit.add(txtPatId);
-        
-        pnlEdit.add(new JLabel("Blood Group:"));
-        JComboBox<String> cmbBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
-        cmbBlood.setSelectedItem(currentBlood); 
-        pnlEdit.add(cmbBlood);
-        
-        pnlEdit.add(new JLabel("Urgency:"));
-        JComboBox<String> cmbUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
-        cmbUrgency.setSelectedItem(currentUrgency); 
-        pnlEdit.add(cmbUrgency);
-        
-        pnlEdit.add(new JLabel("Quantity (Bags):"));
-        JSpinner spnQty = new JSpinner(new SpinnerNumberModel(currentQty, 1, 100, 1)); 
-        pnlEdit.add(spnQty);
-        
-        pnlEdit.add(new JLabel("Status:"));
-        JComboBox<String> cmbStatus = new JComboBox<>(new String[]{"Pending", "Approved", "Fulfilled", "Cancelled"});
-        cmbStatus.setSelectedItem(currentStatus); 
-        pnlEdit.add(cmbStatus);
-        
-        int result = JOptionPane.showConfirmDialog(this, pnlEdit, "Edit Request ID: " + requestId, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        
-        if (result == JOptionPane.OK_OPTION) {
-            try {
-                int newPatId = Integer.parseInt(txtPatId.getText());
-                int newQty = (int) spnQty.getValue();
-                
-                boolean success = new AdminController().updateRequest(requestId, txtHosp.getText(), newPatId, cmbBlood.getSelectedItem().toString(), cmbUrgency.getSelectedItem().toString(), newQty, cmbStatus.getSelectedItem().toString());
-                
-                if (success) {
-                    JOptionPane.showMessageDialog(this, "Request Updated Successfully!");
-                    loadHospitalData(); 
-                } else {
-                    JOptionPane.showMessageDialog(this, "Update Failed. Please check the database connection.", "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Patient ID must be a valid number.", "Input Error", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }
-
+    // --- ACTIONS ---
     private void confirmDeliveryArrival() {
         int selectedRow = deliveryTable.getSelectedRow();
         if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a delivery to confirm."); return; }
@@ -570,6 +503,30 @@ public class AdminDashboardFrame extends JFrame {
                 JOptionPane.showMessageDialog(this, "Request deleted.");
                 loadHospitalData(); 
             } catch (SQLException e) { e.printStackTrace(); }
+        }
+    }
+
+    // --- NEW ACTION: DELETE REQUEST DIRECTLY FROM THE EMERGENCY LOG SCREEN ---
+    private void deleteRequestFromLog() {
+        int selectedRow = alertLogTable.getSelectedRow();
+        if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a log entry first."); return; }
+        
+        // Grab the Request ID from column index 1
+        int modelRow = alertLogTable.convertRowIndexToModel(selectedRow);
+        String requestId = alertLogModel.getValueAt(modelRow, 1).toString(); 
+        
+        if (JOptionPane.showConfirmDialog(this, "Are you sure you want to completely DELETE Request ID " + requestId + "?\nBecause of database rules, this will permanently remove the Request and automatically clear this Emergency Log.", "Confirm Deletion", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION) {
+            String sql = "DELETE FROM Requests WHERE request_id = ?";
+            try (Connection conn = databaseConnectors.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, requestId);
+                pstmt.executeUpdate();
+                JOptionPane.showMessageDialog(this, "Request and all associated logs deleted successfully.");
+                loadEmergencyLogs(); 
+                loadHospitalData(); // Refreshes the hospital tab so the tables stay synced!
+            } catch (SQLException e) { 
+                e.printStackTrace(); 
+                JOptionPane.showMessageDialog(this, "Error deleting request.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 }
