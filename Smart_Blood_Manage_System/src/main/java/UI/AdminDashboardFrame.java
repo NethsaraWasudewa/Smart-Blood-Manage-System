@@ -19,35 +19,76 @@ public class AdminDashboardFrame extends JFrame {
     private JTable donorTable, patientTable, requestTable, deliveryTable;
     private DefaultTableModel donorModel, patientModel, requestModel, deliveryModel;
     private DefaultCategoryDataset barDataset;
+    
+    // Modern Theme Colors based on your teammate's design
+    private final Color primaryBlue = new Color(41, 128, 185);
+    private final Color dangerRed = new Color(231, 76, 60);
+    private final Color successGreen = new Color(46, 204, 113);
 
     public AdminDashboardFrame() {
         setTitle("Admin Dashboard - Manage System & Analytics");
-        setSize(900, 700); // Expanded slightly for the new data
+        setSize(950, 750); 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout()); 
+        getContentPane().setBackground(Color.WHITE);
 
         JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.setFont(new Font("Segoe UI", Font.PLAIN, 14)); // Modern tab font
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 14)); 
+        tabbedPane.setBackground(Color.WHITE);
 
-        // --- TAB 1: CREATE EVENT ---
-        JPanel pnlCreateEvent = new JPanel(new GridLayout(6, 2, 10, 10));
-        pnlCreateEvent.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
-        pnlCreateEvent.add(new JLabel("Event Name:")); 
-        JTextField txtEvent = new JTextField(); pnlCreateEvent.add(txtEvent);
+        // ==========================================
+        // TAB 1: CREATE EVENT (Styled to match Hospital Portal)
+        // ==========================================
+        JPanel pnlCreateEventWrapper = new JPanel(new BorderLayout());
+        pnlCreateEventWrapper.setBackground(Color.WHITE);
         
-        pnlCreateEvent.add(new JLabel("Location:")); 
-        JTextField txtLocation = new JTextField(); pnlCreateEvent.add(txtLocation);
+        // Hero Title
+        JLabel lblFormTitle = new JLabel("Create New Donation Event", SwingConstants.CENTER);
+        lblFormTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        lblFormTitle.setForeground(primaryBlue);
+        lblFormTitle.setBorder(BorderFactory.createEmptyBorder(30, 0, 20, 0));
+        pnlCreateEventWrapper.add(lblFormTitle, BorderLayout.NORTH);
+
+        // Form Fields (Stacked Layout)
+        JPanel pnlCreateEvent = new JPanel(new GridLayout(8, 1, 5, 5));
+        pnlCreateEvent.setBackground(Color.WHITE);
+        pnlCreateEvent.setBorder(BorderFactory.createEmptyBorder(0, 100, 20, 100)); // Padding on sides
+
+        JLabel lblEventName = new JLabel("Event Name:");
+        lblEventName.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        JTextField txtEvent = new JTextField(); 
         
-        pnlCreateEvent.add(new JLabel("Event Date:")); 
+        JLabel lblLocation = new JLabel("Location:");
+        lblLocation.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        JTextField txtLocation = new JTextField(); 
+        
+        JLabel lblDate = new JLabel("Event Date:");
+        lblDate.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         JDateChooser dateChooser = new JDateChooser(); 
         dateChooser.setDateFormatString("yyyy-MM-dd");
-        pnlCreateEvent.add(dateChooser);
         
-        pnlCreateEvent.add(new JLabel("Target Capacity:")); 
-        JSpinner spnCapacity = new JSpinner(new SpinnerNumberModel(50, 10, 1000, 10)); pnlCreateEvent.add(spnCapacity);
+        JLabel lblCapacity = new JLabel("Target Capacity:");
+        lblCapacity.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        JSpinner spnCapacity = new JSpinner(new SpinnerNumberModel(50, 10, 1000, 10)); 
         
-        JButton btnCreate = new JButton("Create Event"); pnlCreateEvent.add(btnCreate);
+        pnlCreateEvent.add(lblEventName); pnlCreateEvent.add(txtEvent);
+        pnlCreateEvent.add(lblLocation); pnlCreateEvent.add(txtLocation);
+        pnlCreateEvent.add(lblDate); pnlCreateEvent.add(dateChooser);
+        pnlCreateEvent.add(lblCapacity); pnlCreateEvent.add(spnCapacity);
+        
+        pnlCreateEventWrapper.add(pnlCreateEvent, BorderLayout.CENTER);
+
+        // Full-Width Submit Button
+        JButton btnCreate = new JButton("Create Event"); 
+        styleButton(btnCreate, primaryBlue);
+        btnCreate.setPreferredSize(new Dimension(0, 45)); // Make it tall and clickable
+        
+        JPanel pnlBtnWrapper = new JPanel(new BorderLayout());
+        pnlBtnWrapper.setBackground(Color.WHITE);
+        pnlBtnWrapper.setBorder(BorderFactory.createEmptyBorder(10, 100, 40, 100));
+        pnlBtnWrapper.add(btnCreate, BorderLayout.CENTER);
+        pnlCreateEventWrapper.add(pnlBtnWrapper, BorderLayout.SOUTH);
         
         btnCreate.addActionListener(e -> {
             try {
@@ -60,52 +101,77 @@ public class AdminDashboardFrame extends JFrame {
             } catch (Exception ex) { JOptionPane.showMessageDialog(this, "An error occurred while creating the event."); }
         });
 
-        // --- TAB 2: MANAGE DONORS ---
+        // ==========================================
+        // TAB 2: MANAGE DONORS
+        // ==========================================
         JPanel pnlManageDonors = new JPanel(new BorderLayout(10, 10));
-        pnlManageDonors.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        pnlManageDonors.setBackground(Color.WHITE);
+        pnlManageDonors.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
         donorModel = new DefaultTableModel(new String[]{"ID", "Name", "Email", "Blood Group", "Location"}, 0);
         donorTable = new JTable(donorModel);
+        donorTable.setRowHeight(25);
         pnlManageDonors.add(new JScrollPane(donorTable), BorderLayout.CENTER);
         setupSearchPanel(pnlManageDonors, donorModel, donorTable);
         
-        JPanel pnlTableButtons = new JPanel();
+        JPanel pnlTableButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlTableButtons.setBackground(Color.WHITE);
         JButton btnRefresh = new JButton("Refresh Data");
+        styleButton(btnRefresh, primaryBlue);
+        
         JButton btnDelete = new JButton("Delete Selected Donor");
+        styleButton(btnDelete, dangerRed);
+        
         pnlTableButtons.add(btnRefresh); pnlTableButtons.add(btnDelete);
         pnlManageDonors.add(pnlTableButtons, BorderLayout.SOUTH);
 
         btnRefresh.addActionListener(e -> loadDonorData());
         btnDelete.addActionListener(e -> deleteDonor());
 
-        // --- TAB 3: HOSPITAL RECORDS ---
+        // ==========================================
+        // TAB 3: HOSPITAL RECORDS
+        // ==========================================
         JPanel pnlHospitalRecords = new JPanel(new BorderLayout(10, 10));
-        pnlHospitalRecords.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        pnlHospitalRecords.setBackground(Color.WHITE);
+        pnlHospitalRecords.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         splitPane.setResizeWeight(0.5);
+        splitPane.setBackground(Color.WHITE);
 
         // Top: Patients
         JPanel pnlPatients = new JPanel(new BorderLayout());
-        pnlPatients.setBorder(BorderFactory.createTitledBorder("Registered Patients"));
+        pnlPatients.setBackground(Color.WHITE);
+        pnlPatients.setBorder(BorderFactory.createTitledBorder(null, "Registered Patients", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new Font("Segoe UI", Font.BOLD, 14), primaryBlue));
+        
         patientModel = new DefaultTableModel(new String[]{"Patient ID", "Hospital", "Name", "Blood Group", "Ward"}, 0);
         patientTable = new JTable(patientModel);
+        patientTable.setRowHeight(25);
         pnlPatients.add(new JScrollPane(patientTable), BorderLayout.CENTER);
         setupSearchPanel(pnlPatients, patientModel, patientTable);
         
-        JPanel pnlPatBtns = new JPanel();
+        JPanel pnlPatBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlPatBtns.setBackground(Color.WHITE);
         JButton btnDelPat = new JButton("Delete Selected Patient");
+        styleButton(btnDelPat, dangerRed);
         pnlPatBtns.add(btnDelPat);
         pnlPatients.add(pnlPatBtns, BorderLayout.SOUTH);
 
         // Bottom: Requests
         JPanel pnlRequests = new JPanel(new BorderLayout());
-        pnlRequests.setBorder(BorderFactory.createTitledBorder("Blood Requests"));
+        pnlRequests.setBackground(Color.WHITE);
+        pnlRequests.setBorder(BorderFactory.createTitledBorder(null, "Blood Requests", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new Font("Segoe UI", Font.BOLD, 14), primaryBlue));
+        
         requestModel = new DefaultTableModel(new String[]{"Req ID", "Hospital", "Patient ID", "Blood Group", "Urgency", "Qty", "Status"}, 0);
         requestTable = new JTable(requestModel);
+        requestTable.setRowHeight(25);
         pnlRequests.add(new JScrollPane(requestTable), BorderLayout.CENTER);
         setupSearchPanel(pnlRequests, requestModel, requestTable);
         
-        JPanel pnlReqBtns = new JPanel();
+        JPanel pnlReqBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlReqBtns.setBackground(Color.WHITE);
         JButton btnDelReq = new JButton("Delete Selected Request");
+        styleButton(btnDelReq, dangerRed);
         pnlReqBtns.add(btnDelReq);
         pnlRequests.add(pnlReqBtns, BorderLayout.SOUTH);
 
@@ -114,27 +180,37 @@ public class AdminDashboardFrame extends JFrame {
         pnlHospitalRecords.add(splitPane, BorderLayout.CENTER);
 
         JButton btnRefreshHospitals = new JButton("Refresh Hospital Data");
-        btnRefreshHospitals.addActionListener(e -> loadHospitalData());
-        pnlHospitalRecords.add(btnRefreshHospitals, BorderLayout.SOUTH);
+        styleButton(btnRefreshHospitals, primaryBlue);
+        JPanel pnlHospRefreshWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        pnlHospRefreshWrapper.setBackground(Color.WHITE);
+        pnlHospRefreshWrapper.add(btnRefreshHospitals);
+        pnlHospitalRecords.add(pnlHospRefreshWrapper, BorderLayout.SOUTH);
 
+        btnRefreshHospitals.addActionListener(e -> loadHospitalData());
         btnDelPat.addActionListener(e -> deletePatient());
         btnDelReq.addActionListener(e -> deleteRequest());
 
-        // --- NEW TAB 4: LOGISTICS & TRANSPORT ---
+        // ==========================================
+        // TAB 4: LOGISTICS & TRANSPORT
+        // ==========================================
         JPanel pnlLogistics = new JPanel(new BorderLayout(10, 10));
-        pnlLogistics.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        pnlLogistics.setBackground(Color.WHITE);
+        pnlLogistics.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
         deliveryModel = new DefaultTableModel(new String[]{"Delivery ID", "Req ID", "Hospital", "Driver", "Status", "Dispatch Time"}, 0);
         deliveryTable = new JTable(deliveryModel);
+        deliveryTable.setRowHeight(25);
         pnlLogistics.add(new JScrollPane(deliveryTable), BorderLayout.CENTER);
         setupSearchPanel(pnlLogistics, deliveryModel, deliveryTable);
         
-        JPanel pnlLogisticsBtns = new JPanel();
-        JButton btnRefreshLogistics = new JButton("Refresh Tracker");
-        JButton btnConfirmArrival = new JButton("Confirm Safe Arrival (Mark Delivered)");
+        JPanel pnlLogisticsBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlLogisticsBtns.setBackground(Color.WHITE);
         
-        btnConfirmArrival.setBackground(new Color(46, 204, 113)); // FlatLaf Green Success Button
-        btnConfirmArrival.setForeground(Color.WHITE);
+        JButton btnRefreshLogistics = new JButton("Refresh Tracker");
+        styleButton(btnRefreshLogistics, primaryBlue);
+        
+        JButton btnConfirmArrival = new JButton("Confirm Safe Arrival (Mark Delivered)");
+        styleButton(btnConfirmArrival, successGreen);
         
         pnlLogisticsBtns.add(btnRefreshLogistics);
         pnlLogisticsBtns.add(btnConfirmArrival);
@@ -143,26 +219,49 @@ public class AdminDashboardFrame extends JFrame {
         btnRefreshLogistics.addActionListener(e -> loadLogisticsData());
         btnConfirmArrival.addActionListener(e -> confirmDeliveryArrival());
 
-        // --- TAB 5: ANALYTICS ---
+        // ==========================================
+        // TAB 5: ANALYTICS
+        // ==========================================
         JPanel pnlAnalytics = new JPanel(new BorderLayout());
-        pnlAnalytics.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        pnlAnalytics.setBackground(Color.WHITE);
+        pnlAnalytics.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
         barDataset = new DefaultCategoryDataset();
         JFreeChart barChart = ChartFactory.createBarChart("Donor Demographics by Location", "City / Location", "Number of Donors", barDataset);
         pnlAnalytics.add(new ChartPanel(barChart), BorderLayout.CENTER);
+        
         JButton btnRefreshChart = new JButton("Refresh Chart Data");
+        styleButton(btnRefreshChart, primaryBlue);
+        JPanel pnlChartBtnWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        pnlChartBtnWrapper.setBackground(Color.WHITE);
+        pnlChartBtnWrapper.add(btnRefreshChart);
+        pnlAnalytics.add(pnlChartBtnWrapper, BorderLayout.SOUTH);
+        
         btnRefreshChart.addActionListener(e -> loadChartData());
-        pnlAnalytics.add(btnRefreshChart, BorderLayout.SOUTH);
 
-        // Add Tabs
-        tabbedPane.add("Create Event", pnlCreateEvent);
+        // --- ADD TABS ---
+        tabbedPane.add("Create Event", pnlCreateEventWrapper);
         tabbedPane.add("Manage Donors", pnlManageDonors);
         tabbedPane.add("Hospital Records", pnlHospitalRecords); 
-        tabbedPane.add("Logistics", pnlLogistics); // Added new tab
+        tabbedPane.add("Logistics", pnlLogistics); 
         tabbedPane.add("Analytics", pnlAnalytics); 
         add(tabbedPane, BorderLayout.CENTER); 
 
+        // ==========================================
+        // STYLED BACK BUTTON (Bottom Center)
+        // ==========================================
         JPanel bottomPanel = new JPanel();
-        JButton btnBack = new JButton("Back to Home");
+        bottomPanel.setBackground(Color.WHITE);
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        
+        JButton btnBack = new JButton("← Back to Home");
+        btnBack.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        btnBack.setForeground(new Color(120, 120, 120)); // Subtle gray
+        btnBack.setContentAreaFilled(false);
+        btnBack.setBorderPainted(false);
+        btnBack.setFocusPainted(false);
+        btnBack.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
         btnBack.addActionListener(e -> { new StartScreenFrame().setVisible(true); this.dispose(); });
         bottomPanel.add(btnBack);
         add(bottomPanel, BorderLayout.SOUTH); 
@@ -174,10 +273,23 @@ public class AdminDashboardFrame extends JFrame {
         loadChartData();
     }
 
-    // SEARCH ENGINE REUSABLE METHOD
+    // --- REUSABLE UI STYLING HELPER ---
+    private void styleButton(JButton btn, Color bgColor) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btn.setBackground(bgColor);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    }
+
+    // --- SEARCH ENGINE ---
     private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        searchPanel.add(new JLabel("Live Search Filter: "));
+        searchPanel.setBackground(Color.WHITE);
+        JLabel lblSearch = new JLabel("Live Search Filter: ");
+        lblSearch.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        searchPanel.add(lblSearch);
+        
         JTextField txtSearch = new JTextField(25);
         searchPanel.add(txtSearch);
 
@@ -218,7 +330,6 @@ public class AdminDashboardFrame extends JFrame {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    // NEW LOGISTICS LOADER (Joins tables to show destination Hospital)
     private void loadLogisticsData() {
         deliveryModel.setRowCount(0);
         String sql = "SELECT d.delivery_id, d.request_id, r.hospital_name, d.driver_name, d.status, d.dispatch_timestamp " +
@@ -263,7 +374,7 @@ public class AdminDashboardFrame extends JFrame {
             if (new AdminController().confirmDelivery(deliveryId, requestId)) {
                 JOptionPane.showMessageDialog(this, "Loop Closed! Delivery logged and Request marked as Fulfilled.");
                 loadLogisticsData();
-                loadHospitalData(); // Refresh requests tab to show 'Fulfilled' status
+                loadHospitalData(); 
             } else {
                 JOptionPane.showMessageDialog(this, "Error confirming delivery.");
             }
