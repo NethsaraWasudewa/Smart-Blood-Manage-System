@@ -1,12 +1,14 @@
 package UI;
 
 import Admin.AdminController;
+import Admin.ReportGenerator; // NEW IMPORT
 import database.databaseConnectors;
 import com.toedter.calendar.JDateChooser; 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
+import java.io.File;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -20,10 +22,11 @@ public class AdminDashboardFrame extends JFrame {
     private DefaultTableModel donorModel, patientModel, requestModel, deliveryModel;
     private DefaultCategoryDataset barDataset;
     
-    // Modern Theme Colors based on your teammate's design
+    // Modern Theme Colors
     private final Color primaryBlue = new Color(41, 128, 185);
     private final Color dangerRed = new Color(231, 76, 60);
     private final Color successGreen = new Color(46, 204, 113);
+    private final Color warningOrange = new Color(230, 126, 34); // New color for PDF Button
 
     public AdminDashboardFrame() {
         setTitle("Admin Dashboard - Manage System & Analytics");
@@ -38,22 +41,20 @@ public class AdminDashboardFrame extends JFrame {
         tabbedPane.setBackground(Color.WHITE);
 
         // ==========================================
-        // TAB 1: CREATE EVENT (Styled to match Hospital Portal)
+        // TAB 1: CREATE EVENT 
         // ==========================================
         JPanel pnlCreateEventWrapper = new JPanel(new BorderLayout());
         pnlCreateEventWrapper.setBackground(Color.WHITE);
         
-        // Hero Title
         JLabel lblFormTitle = new JLabel("Create New Donation Event", SwingConstants.CENTER);
         lblFormTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblFormTitle.setForeground(primaryBlue);
         lblFormTitle.setBorder(BorderFactory.createEmptyBorder(30, 0, 20, 0));
         pnlCreateEventWrapper.add(lblFormTitle, BorderLayout.NORTH);
 
-        // Form Fields (Stacked Layout)
         JPanel pnlCreateEvent = new JPanel(new GridLayout(8, 1, 5, 5));
         pnlCreateEvent.setBackground(Color.WHITE);
-        pnlCreateEvent.setBorder(BorderFactory.createEmptyBorder(0, 100, 20, 100)); // Padding on sides
+        pnlCreateEvent.setBorder(BorderFactory.createEmptyBorder(0, 100, 20, 100)); 
 
         JLabel lblEventName = new JLabel("Event Name:");
         lblEventName.setFont(new Font("Segoe UI", Font.PLAIN, 14));
@@ -79,10 +80,9 @@ public class AdminDashboardFrame extends JFrame {
         
         pnlCreateEventWrapper.add(pnlCreateEvent, BorderLayout.CENTER);
 
-        // Full-Width Submit Button
         JButton btnCreate = new JButton("Create Event"); 
         styleButton(btnCreate, primaryBlue);
-        btnCreate.setPreferredSize(new Dimension(0, 45)); // Make it tall and clickable
+        btnCreate.setPreferredSize(new Dimension(0, 45)); 
         
         JPanel pnlBtnWrapper = new JPanel(new BorderLayout());
         pnlBtnWrapper.setBackground(Color.WHITE);
@@ -129,7 +129,7 @@ public class AdminDashboardFrame extends JFrame {
         btnDelete.addActionListener(e -> deleteDonor());
 
         // ==========================================
-        // TAB 3: HOSPITAL RECORDS
+        // TAB 3: HOSPITAL RECORDS (Now with PDF Export!)
         // ==========================================
         JPanel pnlHospitalRecords = new JPanel(new BorderLayout(10, 10));
         pnlHospitalRecords.setBackground(Color.WHITE);
@@ -179,16 +179,47 @@ public class AdminDashboardFrame extends JFrame {
         splitPane.setBottomComponent(pnlRequests);
         pnlHospitalRecords.add(splitPane, BorderLayout.CENTER);
 
+        // --- NEW: EXPORT PDF BUTTON ---
         JButton btnRefreshHospitals = new JButton("Refresh Hospital Data");
         styleButton(btnRefreshHospitals, primaryBlue);
+        
+        JButton btnExportPDF = new JButton("Export Requests to PDF");
+        styleButton(btnExportPDF, warningOrange); // Gives it a distinct color
+        
         JPanel pnlHospRefreshWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlHospRefreshWrapper.setBackground(Color.WHITE);
         pnlHospRefreshWrapper.add(btnRefreshHospitals);
+        pnlHospRefreshWrapper.add(btnExportPDF); // Added to panel
         pnlHospitalRecords.add(pnlHospRefreshWrapper, BorderLayout.SOUTH);
 
         btnRefreshHospitals.addActionListener(e -> loadHospitalData());
         btnDelPat.addActionListener(e -> deletePatient());
         btnDelReq.addActionListener(e -> deleteRequest());
+        
+        // --- NEW: PDF GENERATOR ACTION ---
+        btnExportPDF.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Save PDF Report");
+            fileChooser.setSelectedFile(new File("Hospital_Requests_Report.pdf"));
+            
+            int userSelection = fileChooser.showSaveDialog(this);
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File fileToSave = fileChooser.getSelectedFile();
+                String filePath = fileToSave.getAbsolutePath();
+                
+                // Ensure it ends with .pdf
+                if (!filePath.toLowerCase().endsWith(".pdf")) {
+                    filePath += ".pdf";
+                }
+                
+                ReportGenerator reportGen = new ReportGenerator();
+                if(reportGen.generateHospitalReport(filePath)) {
+                    JOptionPane.showMessageDialog(this, "PDF Generated Successfully!\nSaved at: " + filePath, "Success", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Failed to generate PDF. Make sure the file is not currently open.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
 
         // ==========================================
         // TAB 4: LOGISTICS & TRANSPORT
@@ -248,7 +279,7 @@ public class AdminDashboardFrame extends JFrame {
         add(tabbedPane, BorderLayout.CENTER); 
 
         // ==========================================
-        // STYLED BACK BUTTON (Bottom Center)
+        // STYLED BACK BUTTON
         // ==========================================
         JPanel bottomPanel = new JPanel();
         bottomPanel.setBackground(Color.WHITE);
@@ -256,7 +287,7 @@ public class AdminDashboardFrame extends JFrame {
         
         JButton btnBack = new JButton("← Back to Home");
         btnBack.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        btnBack.setForeground(new Color(120, 120, 120)); // Subtle gray
+        btnBack.setForeground(new Color(120, 120, 120)); 
         btnBack.setContentAreaFilled(false);
         btnBack.setBorderPainted(false);
         btnBack.setFocusPainted(false);
@@ -273,7 +304,6 @@ public class AdminDashboardFrame extends JFrame {
         loadChartData();
     }
 
-    // --- REUSABLE UI STYLING HELPER ---
     private void styleButton(JButton btn, Color bgColor) {
         btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
         btn.setBackground(bgColor);
@@ -282,7 +312,6 @@ public class AdminDashboardFrame extends JFrame {
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
-    // --- SEARCH ENGINE ---
     private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         searchPanel.setBackground(Color.WHITE);
@@ -309,7 +338,6 @@ public class AdminDashboardFrame extends JFrame {
         panel.add(searchPanel, BorderLayout.NORTH);
     }
 
-    // --- DATA LOADING METHODS ---
     private void loadDonorData() {
         donorModel.setRowCount(0); 
         String sql = "SELECT donor_id, name, email, blood_group, location FROM Donors";
@@ -355,7 +383,6 @@ public class AdminDashboardFrame extends JFrame {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    // --- ACTIONS ---
     private void confirmDeliveryArrival() {
         int selectedRow = deliveryTable.getSelectedRow();
         if (selectedRow == -1) { JOptionPane.showMessageDialog(this, "Select a delivery to confirm."); return; }
