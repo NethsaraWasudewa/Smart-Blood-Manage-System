@@ -98,7 +98,7 @@ public class HospitalRequestFrame extends JFrame {
         });
 
         // ==========================================
-        // TAB 3: SEND REQUEST 
+        // TAB 3: SEND REQUEST (UPGRADED WITH SMART ENGINE)
         // ==========================================
         JPanel pnlRequestWrapper = new JPanel(new BorderLayout());
         pnlRequestWrapper.setBackground(Color.WHITE);
@@ -152,21 +152,24 @@ public class HospitalRequestFrame extends JFrame {
             try {
                 int patientId = Integer.parseInt(txtReqPatId.getText());
                 String urgency = cmbReqUrgency.getSelectedItem().toString();
+                String requestedBlood = cmbReqBlood.getSelectedItem().toString();
+                int qty = (Integer) spnReqQty.getValue();
 
-                boolean success = new HospitalController().submitRequest(
-                    txtReqHospName.getText(),
-                    txtReqCity.getText(), 
-                    patientId,
-                    cmbReqBlood.getSelectedItem().toString(),
-                    (Integer) spnReqQty.getValue(),
-                    urgency
+                HospitalController controller = new HospitalController();
+                
+                // 1. Submit the Request to the DB
+                boolean success = controller.submitRequest(
+                    txtReqHospName.getText(), txtReqCity.getText(), patientId, requestedBlood, qty, urgency
                 );
 
                 if (success) {
+                    // 2. RUN THE SMART MEDICAL INVENTORY SCAN
+                    String smartReport = controller.analyzeInventoryCompatibility(requestedBlood, qty);
+                    
                     if(urgency.equals("Emergency")) {
-                        JOptionPane.showMessageDialog(this, "EMERGENCY LOGGED: Local donors in " + txtReqCity.getText() + " have been automatically alerted via email!", "Emergency Dispatch Active", JOptionPane.WARNING_MESSAGE);
+                        JOptionPane.showMessageDialog(this, "EMERGENCY LOGGED: Local donors in " + txtReqCity.getText() + " alerted!\n\n--- INVENTORY SCAN RESULT ---\n" + smartReport, "Emergency Dispatch & Inventory", JOptionPane.WARNING_MESSAGE);
                     } else {
-                        JOptionPane.showMessageDialog(this, "Standard Request Submitted Successfully.");
+                        JOptionPane.showMessageDialog(this, "Request Logged Successfully.\n\n--- INVENTORY SCAN RESULT ---\n" + smartReport, "Smart Compatibility Report", JOptionPane.INFORMATION_MESSAGE);
                     }
                 } else {
                     JOptionPane.showMessageDialog(this, "Error submitting request. Verify Patient ID exists.");
