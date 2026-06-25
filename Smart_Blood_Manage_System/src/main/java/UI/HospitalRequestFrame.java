@@ -4,25 +4,33 @@ import hospital.HospitalController;
 import database.databaseConnectors;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.sql.*;
 
 public class HospitalRequestFrame extends JFrame {
-    private JTable inventoryTable, deliveriesTable;
-    private DefaultTableModel inventoryModel, deliveriesModel;
+    private JTable inventoryTable, deliveriesTable, patientTable;
+    private DefaultTableModel inventoryModel, deliveriesModel, patientModel;
+    private JTabbedPane tabbedPane;
+
+    // Form fields declared here so they can be auto-filled from other tabs
+    private JTextField txtReqHospName, txtReqCity, txtReqPatId;
+    private JComboBox<String> cmbReqBlood, cmbReqUrgency;
+    private JSpinner spnReqQty;
 
     private final Color primaryBlue = new Color(41, 128, 185);
     private final Color dangerRed = new Color(231, 76, 60);
+    private final Color successGreen = new Color(46, 204, 113);
 
     public HospitalRequestFrame() {
         setTitle("Hospital Portal - Blood Requests & Deliveries");
-        setSize(850, 750); 
+        setSize(900, 750); 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         getContentPane().setBackground(Color.WHITE);
 
-        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane = new JTabbedPane();
         tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 14));
         tabbedPane.setBackground(Color.WHITE);
 
@@ -92,13 +100,68 @@ public class HospitalRequestFrame extends JFrame {
             if(new HospitalController().registerPatient(txtRegHospName.getText(), txtPatientName.getText(), cmbRegBlood.getSelectedItem().toString(), txtWard.getText())) {
                 JOptionPane.showMessageDialog(this, "Patient Registered Successfully!");
                 txtRegHospName.setText(""); txtPatientName.setText(""); txtWard.setText("");
+                
+                // --- UPGRADE: Automatically jump to Patient Records so they see the new ID ---
+                loadPatientData(); 
+                tabbedPane.setSelectedIndex(2); 
             } else {
                 JOptionPane.showMessageDialog(this, "Error registering patient.");
             }
         });
 
         // ==========================================
-        // TAB 3: SEND REQUEST (UPGRADED WITH SMART ENGINE)
+        // TAB 3: PATIENT RECORDS (NEW DIRECTORY TAB)
+        // ==========================================
+        JPanel pnlPatientRecords = new JPanel(new BorderLayout(10, 10));
+        pnlPatientRecords.setBackground(Color.WHITE);
+        pnlPatientRecords.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        patientModel = new DefaultTableModel(new String[]{"Patient ID", "Hospital Name", "Patient Name", "Blood Group", "Ward"}, 0);
+        patientTable = new JTable(patientModel);
+        patientTable.setRowHeight(25);
+        pnlPatientRecords.add(new JScrollPane(patientTable), BorderLayout.CENTER);
+        
+        setupSearchPanel(pnlPatientRecords, patientModel, patientTable);
+
+        JPanel pnlPatientBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pnlPatientBtns.setBackground(Color.WHITE);
+
+        JButton btnRefreshPatients = new JButton("Refresh Directory");
+        styleButton(btnRefreshPatients, primaryBlue);
+
+        JButton btnAutoFill = new JButton("Send Request for Selected Patient");
+        styleButton(btnAutoFill, successGreen); // Highlighted in green because it's a primary action!
+
+        pnlPatientBtns.add(btnRefreshPatients);
+        pnlPatientBtns.add(btnAutoFill);
+        pnlPatientRecords.add(pnlPatientBtns, BorderLayout.SOUTH);
+
+        btnRefreshPatients.addActionListener(e -> loadPatientData());
+        
+        // --- UPGRADE: Smart Auto-Fill Logic ---
+        btnAutoFill.addActionListener(e -> {
+            int selectedRow = patientTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a patient from the list first.", "Action Required", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            
+            int modelRow = patientTable.convertRowIndexToModel(selectedRow);
+            String patId = patientModel.getValueAt(modelRow, 0).toString();
+            String hospName = patientModel.getValueAt(modelRow, 1).toString();
+            String bGroup = patientModel.getValueAt(modelRow, 3).toString();
+
+            // Inject the data into the form fields on the next tab
+            txtReqPatId.setText(patId);
+            txtReqHospName.setText(hospName);
+            cmbReqBlood.setSelectedItem(bGroup);
+
+            // Jump the user directly to the "Send Request" tab
+            tabbedPane.setSelectedIndex(3); 
+        });
+
+        // ==========================================
+        // TAB 4: SEND REQUEST
         // ==========================================
         JPanel pnlRequestWrapper = new JPanel(new BorderLayout());
         pnlRequestWrapper.setBackground(Color.WHITE);
@@ -114,26 +177,26 @@ public class HospitalRequestFrame extends JFrame {
         pnlRequest.setBorder(BorderFactory.createEmptyBorder(0, 150, 10, 150));
 
         pnlRequest.add(new JLabel("Hospital Name:"));
-        JTextField txtReqHospName = new JTextField(); pnlRequest.add(txtReqHospName);
+        txtReqHospName = new JTextField(); pnlRequest.add(txtReqHospName);
 
         JLabel lblCity = new JLabel("Hospital City / Region (For Emergency Alerts):");
         lblCity.setForeground(dangerRed); 
         pnlRequest.add(lblCity);
-        JTextField txtReqCity = new JTextField(); pnlRequest.add(txtReqCity);
+        txtReqCity = new JTextField(); pnlRequest.add(txtReqCity);
 
         pnlRequest.add(new JLabel("Patient ID (Required):"));
-        JTextField txtReqPatId = new JTextField(); pnlRequest.add(txtReqPatId);
+        txtReqPatId = new JTextField(); pnlRequest.add(txtReqPatId);
 
         pnlRequest.add(new JLabel("Required Blood Group:"));
-        JComboBox<String> cmbReqBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
+        cmbReqBlood = new JComboBox<>(new String[]{"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"});
         pnlRequest.add(cmbReqBlood);
 
         pnlRequest.add(new JLabel("Quantity (Bags):"));
-        JSpinner spnReqQty = new JSpinner(new SpinnerNumberModel(1, 1, 50, 1));
+        spnReqQty = new JSpinner(new SpinnerNumberModel(1, 1, 50, 1));
         pnlRequest.add(spnReqQty);
 
         pnlRequest.add(new JLabel("Urgency Level:"));
-        JComboBox<String> cmbReqUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
+        cmbReqUrgency = new JComboBox<>(new String[]{"Standard", "Emergency"});
         pnlRequest.add(cmbReqUrgency);
 
         pnlRequestWrapper.add(pnlRequest, BorderLayout.CENTER);
@@ -157,13 +220,11 @@ public class HospitalRequestFrame extends JFrame {
 
                 HospitalController controller = new HospitalController();
                 
-                // 1. Submit the Request to the DB
                 boolean success = controller.submitRequest(
                     txtReqHospName.getText(), txtReqCity.getText(), patientId, requestedBlood, qty, urgency
                 );
 
                 if (success) {
-                    // 2. RUN THE SMART MEDICAL INVENTORY SCAN
                     String smartReport = controller.analyzeInventoryCompatibility(requestedBlood, qty);
                     
                     if(urgency.equals("Emergency")) {
@@ -171,6 +232,7 @@ public class HospitalRequestFrame extends JFrame {
                     } else {
                         JOptionPane.showMessageDialog(this, "Request Logged Successfully.\n\n--- INVENTORY SCAN RESULT ---\n" + smartReport, "Smart Compatibility Report", JOptionPane.INFORMATION_MESSAGE);
                     }
+                    txtReqPatId.setText(""); // Clear ID to prevent double submission
                 } else {
                     JOptionPane.showMessageDialog(this, "Error submitting request. Verify Patient ID exists.");
                 }
@@ -180,7 +242,7 @@ public class HospitalRequestFrame extends JFrame {
         });
 
         // ==========================================
-        // TAB 4: TRACK DELIVERIES
+        // TAB 5: TRACK DELIVERIES
         // ==========================================
         JPanel pnlDeliveries = new JPanel(new BorderLayout(10, 10));
         pnlDeliveries.setBackground(Color.WHITE);
@@ -203,6 +265,7 @@ public class HospitalRequestFrame extends JFrame {
         // --- ADD TABS ---
         tabbedPane.add("Live Capacity", pnlInventory);
         tabbedPane.add("Register Patient", pnlRegPatientWrapper);
+        tabbedPane.add("Patient Records", pnlPatientRecords); // <--- NEW TAB ADDED HERE
         tabbedPane.add("Send Request", pnlRequestWrapper);
         tabbedPane.add("Track Deliveries", pnlDeliveries);
         add(tabbedPane, BorderLayout.CENTER);
@@ -225,6 +288,7 @@ public class HospitalRequestFrame extends JFrame {
         add(bottomPanel, BorderLayout.SOUTH);
 
         loadInventoryData();
+        loadPatientData(); 
         loadDeliveriesData();
     }
 
@@ -236,12 +300,49 @@ public class HospitalRequestFrame extends JFrame {
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
+    private void setupSearchPanel(JPanel panel, DefaultTableModel model, JTable table) {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setBackground(Color.WHITE);
+        JLabel lblSearch = new JLabel("Live Search Filter: ");
+        lblSearch.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        searchPanel.add(lblSearch);
+        
+        JTextField txtSearch = new JTextField(25);
+        searchPanel.add(txtSearch);
+
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().length() == 0) sorter.setRowFilter(null);
+                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(text)));
+            }
+        });
+        panel.add(searchPanel, BorderLayout.NORTH);
+    }
+
     private void loadInventoryData() {
         inventoryModel.setRowCount(0);
         String sql = "SELECT blood_group, COUNT(*) as available FROM Inventory WHERE status = 'Available' GROUP BY blood_group";
         try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             while(rs.next()) {
                 inventoryModel.addRow(new Object[]{rs.getString("blood_group"), rs.getInt("available")});
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    // --- NEW: FETCH PATIENT DATA FOR THE DIRECTORY ---
+    private void loadPatientData() {
+        patientModel.setRowCount(0);
+        String sql = "SELECT patient_id, hospital_name, patient_name, blood_group, ward_number FROM Patients ORDER BY patient_id DESC";
+        try (Connection conn = databaseConnectors.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            while(rs.next()) {
+                patientModel.addRow(new Object[]{rs.getInt("patient_id"), rs.getString("hospital_name"), rs.getString("patient_name"), rs.getString("blood_group"), rs.getString("ward_number")});
             }
         } catch (SQLException e) { e.printStackTrace(); }
     }
